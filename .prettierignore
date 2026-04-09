@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+build
+coverage
+vault
+supabase
+*.md
+package-lock.json
