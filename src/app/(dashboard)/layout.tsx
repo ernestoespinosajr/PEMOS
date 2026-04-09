@@ -37,7 +37,6 @@ export default function DashboardLayout({
         )}
       >
         <Header
-          title="PEMOS"
           isMobile={isMobile}
           onToggleMobile={toggleMobile}
         />

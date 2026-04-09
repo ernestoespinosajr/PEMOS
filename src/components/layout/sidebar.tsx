@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -114,7 +115,7 @@ export function Sidebar({
       {/* Brand Area */}
       <div
         className={cn(
-          'flex h-header items-center border-b border-border',
+          'flex h-header items-center',
           isCollapsed && !isMobile ? 'justify-center px-space-2' : 'px-space-4'
         )}
       >
@@ -123,11 +124,15 @@ export function Sidebar({
           className="flex items-center gap-space-2"
           onClick={isMobile ? onCloseMobile : undefined}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-white font-bold text-sm">
-            P
-          </div>
+          <Image
+            src="/logo.svg"
+            alt="PEMOS"
+            width={28}
+            height={28}
+            className="flex-shrink-0"
+          />
           {(!isCollapsed || isMobile) && (
-            <span className="text-lg font-bold text-primary-dark">PEMOS</span>
+            <span className="text-lg font-bold text-primary-text">PEMOS</span>
           )}
         </Link>
 

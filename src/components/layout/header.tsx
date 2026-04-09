@@ -4,12 +4,11 @@ import { Bell, Menu, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
-  title: string;
   isMobile: boolean;
   onToggleMobile: () => void;
 }
 
-export function Header({ title, isMobile, onToggleMobile }: HeaderProps) {
+export function Header({ isMobile, onToggleMobile }: HeaderProps) {
   return (
     <header
       className={cn(
@@ -28,15 +27,8 @@ export function Header({ title, isMobile, onToggleMobile }: HeaderProps) {
         </button>
       )}
 
-      {/* Page Title */}
-      <h1
-        className={cn(
-          'text-lg font-semibold text-primary-text',
-          isMobile && 'text-center flex-1'
-        )}
-      >
-        {title}
-      </h1>
+      {/* Spacer to push right section */}
+      <div className="flex-1" />
 
       {/* Right Section */}
       <div className="ml-auto flex items-center gap-space-3">
