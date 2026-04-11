@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Flag,
   LayoutDashboard,
   LogOut,
@@ -15,6 +17,7 @@ import {
   Network,
   Settings,
   FileText,
+  UserSearch,
   Users,
   X,
 } from 'lucide-react';
@@ -57,7 +60,6 @@ const navSections: NavSection[] = [
         title: 'Monitoreo',
         href: '/monitoreo',
         icon: Monitor,
-        badge: 3,
       },
       {
         title: 'Recintos',
@@ -69,11 +71,26 @@ const navSections: NavSection[] = [
         href: '/candidatos',
         icon: Flag,
       },
+      {
+        title: 'No Inscritos',
+        href: '/seguimiento',
+        icon: UserSearch,
+      },
+      {
+        title: 'Cronograma',
+        href: '/cronograma',
+        icon: CalendarDays,
+      },
     ],
   },
   {
     label: 'Reportes',
     items: [
+      {
+        title: 'Reportes',
+        href: '/reportes',
+        icon: ClipboardList,
+      },
       {
         title: 'Informes',
         href: '/informes',
@@ -89,6 +106,11 @@ const navSections: NavSection[] = [
 ];
 
 const bottomItems = [
+  {
+    title: 'Usuarios',
+    href: '/configuracion/usuarios',
+    icon: Users,
+  },
   {
     title: 'Configuracion',
     href: '/configuracion',

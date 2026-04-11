@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 export default function AuthLayout({
   children,
 }: {
@@ -8,9 +10,14 @@ export default function AuthLayout({
       <main id="main-content" className="w-full max-w-md" role="main">
         {/* Brand */}
         <div className="mb-space-8 text-center">
-          <div className="mx-auto mb-space-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-white font-bold text-xl">
-            P
-          </div>
+          <Image
+            src="/logo.svg"
+            alt="PEMOS"
+            width={48}
+            height={48}
+            className="mx-auto mb-space-4"
+            priority
+          />
           <h1 className="text-2xl font-bold text-primary-dark">PEMOS</h1>
           <p className="mt-space-1 text-sm text-secondary-text">
             Sistema de Monitoreo Electoral
