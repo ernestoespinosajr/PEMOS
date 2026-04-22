@@ -1,6 +1,6 @@
 # PEMOS - Dominican Electoral Management System
 
-PEMOS is a comprehensive full-stack electoral management platform designed for Dominican political organizations. It provides tools for member tracking, electoral precinct management, candidate coordination, vote counting, and real-time dashboard analytics for electoral campaigns.
+
 
 ## Features
 
