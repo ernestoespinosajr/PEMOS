@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { verifyApiAuth } from '@/lib/auth/verify-api-auth';
 
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ---------------------------------------------------------------------------
 // GET /api/seguimiento/[id]/historial
@@ -52,7 +52,7 @@ export async function GET(
     ...new Set((data ?? []).map((h) => (h as Record<string, unknown>).usuario_id as string)),
   ];
 
-  let usuarioMap: Record<string, { nombre: string; apellido: string }> = {};
+  const usuarioMap: Record<string, { nombre: string; apellido: string }> = {};
 
   if (usuarioIds.length > 0) {
     const { data: usuarios } = await supabase

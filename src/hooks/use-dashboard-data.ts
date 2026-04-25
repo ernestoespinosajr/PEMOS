@@ -200,10 +200,13 @@ export function useDashboardData({
   // ---- Initial Load & Filter Changes ----
 
   useEffect(() => {
+    if (!periodoId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     fetchAllData().finally(() => setIsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodoId, filters.circunscripcion_id, filters.municipio_id, filters.recinto_id]);
+  }, [fetchAllData, periodoId]);
 
   // Cleanup debounce timer
   useEffect(() => {

@@ -7,7 +7,7 @@ import type { BulkAction } from '@/types/member';
 // ---------------------------------------------------------------------------
 
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const VALID_ACTIONS: BulkAction[] = [
   'assign_coordinator',
@@ -233,7 +233,8 @@ export async function POST(request: Request) {
   // Perform the bulk update
   const { data: updated, error: updateError } = await supabase
     .from('miembros')
-    .update(updateData)
+    // Supabase generated types reject Record<string, unknown> for dynamic update payload — cast to never
+    .update(updateData as never)
     .in('id', member_ids)
     .select('id');
 

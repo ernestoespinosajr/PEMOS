@@ -9,12 +9,13 @@
 /**
  * User roles in the PEMOS system, ordered by privilege level (highest first).
  *
- * - admin: Full system access, user management, configuration
+ * - platform_admin: Super-admin with cross-tenant management (tenant provisioning, platform settings)
+ * - admin: Full system access within a tenant, user management, configuration
  * - coordinator: Manages members, electoral operations within their geographic scope
  * - observer: Read-only access to electoral data and reports
  * - field_worker: Limited access for field data entry and member management
  */
-export type UserRole = 'admin' | 'coordinator' | 'observer' | 'field_worker';
+export type UserRole = 'platform_admin' | 'admin' | 'coordinator' | 'observer' | 'field_worker';
 
 /**
  * Geographic hierarchy levels in the Dominican political system.
@@ -38,13 +39,32 @@ export interface GeographicScope {
 }
 
 /**
+ * Tenant branding configuration injected into JWT by custom_access_token_hook.
+ * Available for non-platform-admin users to apply tenant-specific theming.
+ */
+export interface TenantConfig {
+  nombre: string;
+  slug: string;
+  logo_url: string | null;
+  color_primario: string;
+  color_secundario: string;
+  plan: 'basico' | 'profesional' | 'empresarial';
+}
+
+/**
  * Custom JWT claims injected by the `custom_access_token_hook` function.
  * These are available in the decoded JWT on both client and server.
+ *
+ * IMPORTANT: The application role is stored in `app_role` (NOT `role`).
+ * The JWT `role` claim is reserved for PostgREST and must remain 'authenticated'.
+ * See migration 20260410000013_fix_jwt_role_claim_collision.sql for details.
  */
 export interface CustomClaims {
-  role: UserRole;
+  app_role: UserRole;
   tenant_id: string;
   geographic_scope: GeographicScope | null;
+  tenant_config?: TenantConfig;
+  tenant_suspended?: boolean;
 }
 
 /**
@@ -71,4 +91,6 @@ export type PermissionAction =
   | 'manage_schedules'
   | 'manage_seguimiento'
   | 'generate_reports'
-  | 'manage_report_archives';
+  | 'manage_report_archives'
+  | 'manage_tenants'
+  | 'manage_platform';

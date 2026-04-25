@@ -47,27 +47,30 @@ export const LEVEL_LABELS: Record<
 };
 
 /** Map from each level to its Supabase table name. */
-export const LEVEL_TABLE: Record<HierarchyLevel, string> = {
+export const LEVEL_TABLE = {
   provincia: 'provincias',
   municipio: 'municipios',
   circunscripcion: 'circunscripciones',
   sector: 'sectores',
   comite: 'comites',
   nivel_intermedio: 'niveles_intermedios',
-};
+} as const satisfies Record<HierarchyLevel, keyof Database['public']['Tables']>;
+
+/** Literal-union table name derived from LEVEL_TABLE values. */
+export type HierarchyTableName = (typeof LEVEL_TABLE)[HierarchyLevel];
 
 /**
  * Map each level to the foreign key column that points to its parent.
  * Provincia has no parent so it is null.
  */
-export const LEVEL_PARENT_FK: Record<HierarchyLevel, string | null> = {
+export const LEVEL_PARENT_FK = {
   provincia: null,
   municipio: 'provincia_id',
   circunscripcion: 'municipio_id',
   sector: 'circunscripcion_id',
   comite: 'sector_id',
   nivel_intermedio: 'comite_id',
-};
+} as const satisfies Record<HierarchyLevel, string | null>;
 
 /** The child level for each level, or null if leaf. */
 export function getChildLevel(
@@ -75,7 +78,7 @@ export function getChildLevel(
 ): HierarchyLevel | null {
   const idx = HIERARCHY_ORDER.indexOf(level);
   if (idx === -1 || idx === HIERARCHY_ORDER.length - 1) return null;
-  return HIERARCHY_ORDER[idx + 1];
+  return HIERARCHY_ORDER[idx + 1] ?? null;
 }
 
 /** The parent level for each level, or null if root. */
@@ -84,7 +87,7 @@ export function getParentLevel(
 ): HierarchyLevel | null {
   const idx = HIERARCHY_ORDER.indexOf(level);
   if (idx <= 0) return null;
-  return HIERARCHY_ORDER[idx - 1];
+  return HIERARCHY_ORDER[idx - 1] ?? null;
 }
 
 // ---------- Entity Types ----------

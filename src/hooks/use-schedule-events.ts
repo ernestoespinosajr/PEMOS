@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type {
   ScheduleEvent,
@@ -105,11 +105,15 @@ export function useScheduleEvents({
         );
 
       // Date range filter (for calendar view)
+      // An event overlaps the visible range when it starts before the range
+      // ends AND it ends after the range starts. Because fecha_fin is nullable
+      // (legacy rows may lack it), we treat NULL fecha_fin as a point-in-time
+      // event whose end equals its start -- so we include it when fecha_inicio
+      // is within the range.
       if (startDate && endDate) {
-        // Events that overlap with the visible range
         query = query
           .lte('fecha_inicio', endDate)
-          .gte('fecha_fin', startDate);
+          .or(`fecha_fin.gte.${startDate},fecha_fin.is.null`);
       }
 
       // Upcoming: future events sorted by start date ascending
@@ -220,21 +224,32 @@ export function useScheduleEvents({
     };
   }, [fetchEvents]);
 
-  // Transform events to FullCalendar format
-  const calendarEvents: CalendarEvent[] = events.map((evt) => {
-    const colors = CategoryColors[evt.categoria] ?? CategoryColors.otro;
-    return {
-      id: evt.id,
-      title: evt.titulo,
-      start: evt.fecha_inicio,
-      end: evt.fecha_fin,
-      allDay: evt.todo_el_dia,
-      backgroundColor: evt.color ?? colors.bg,
-      borderColor: evt.color ?? colors.border,
-      textColor: colors.text,
-      extendedProps: { event: evt },
-    };
-  });
+  // Transform events to FullCalendar format.
+  // Memoised so FullCalendar receives a stable array reference when the
+  // underlying events have not changed. FullCalendar v6 uses element-level
+  // reference equality to detect changes; an unstable array can cause it
+  // to repeatedly reset its internal event store.
+  const calendarEvents: CalendarEvent[] = useMemo(
+    () =>
+      events.map((evt) => {
+        const colors = CategoryColors[evt.categoria] ?? CategoryColors.otro;
+        return {
+          id: evt.id,
+          title: evt.titulo,
+          start: evt.fecha_inicio,
+          // FullCalendar needs a valid end value. When fecha_fin is null
+          // (legacy rows), fall back to fecha_inicio so the event renders
+          // as a point-in-time entry instead of being silently dropped.
+          end: evt.fecha_fin ?? evt.fecha_inicio,
+          allDay: evt.todo_el_dia,
+          backgroundColor: evt.color ?? colors.bg,
+          borderColor: evt.color ?? colors.border,
+          textColor: colors.text,
+          extendedProps: { event: evt },
+        };
+      }),
+    [events]
+  );
 
   return {
     events,

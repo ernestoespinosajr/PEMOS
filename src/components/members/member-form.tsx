@@ -56,7 +56,7 @@ const memberFormSchema = z.object({
     .string()
     .min(2, 'El apellido es requerido (minimo 2 caracteres)'),
   tipo_miembro: z.enum(['coordinador', 'multiplicador', 'relacionado'], {
-    required_error: 'Selecciona un tipo de miembro',
+    message: 'Selecciona un tipo de miembro',
   }),
   apodo: z.string().optional().default(''),
   sexo: z.string().optional().default(''),
@@ -142,7 +142,8 @@ export function MemberForm({
     control,
     formState: { errors },
   } = useForm<MemberFormValues>({
-    resolver: zodResolver(memberFormSchema),
+    // Zod v4 + @hookform/resolvers — .default() narrows inferred type, mismatching MemberFormValues optionality
+    resolver: zodResolver(memberFormSchema) as never,
     defaultValues: {
       cedula: member ? formatCedula(member.cedula) : '',
       nombre: member?.nombre ?? '',

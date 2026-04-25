@@ -98,7 +98,8 @@ export function CreateEntityDialog({
         payload[parentFk] = parentId;
       }
 
-      const { error } = await supabase.from(table).insert(payload);
+      // Supabase generated types reject Record<string, unknown> for dynamic insert payload — cast to never
+      const { error } = await supabase.from(table).insert(payload as never);
 
       if (error) {
         setApiError(error.message);
@@ -301,7 +302,8 @@ export function EditEntityDialog({
 
       const { error } = await supabase
         .from(table)
-        .update(payload)
+        // Supabase generated types reject Record<string, unknown> for dynamic update payload — cast to never
+        .update(payload as never)
         .eq('id', entity.id);
 
       if (error) {

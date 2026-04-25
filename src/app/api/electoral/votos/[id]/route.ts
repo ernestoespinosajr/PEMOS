@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/supabase';
 
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * PATCH /api/electoral/votos/[id]
@@ -112,7 +112,7 @@ export async function PATCH(
       }
 
       // Upsert partido_votos for each party
-      for (const [candPartidoId, pv] of Object.entries(partyVotes)) {
+      for (const [_candPartidoId, pv] of Object.entries(partyVotes)) {
         const votes = pv.votes;
         const upsertData: Database['public']['Tables']['partido_votos']['Insert'] = {
           recinto_id: recintoId,

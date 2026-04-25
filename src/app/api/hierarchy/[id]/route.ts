@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * UUID v4 validation regex.
  */
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Map of table names to their parent FK column and parent table.
@@ -35,7 +35,7 @@ const TABLE_NAMES: TableName[] = [
 /**
  * Singular level names that map to table names.
  */
-const LEVEL_TO_TABLE: Record<string, TableName> = {
+const _LEVEL_TO_TABLE: Record<string, TableName> = {
   provincia: 'provincias',
   municipio: 'municipios',
   circunscripcion: 'circunscripciones',
@@ -69,7 +69,8 @@ async function findEntityById(
       .single();
 
     if (!error && data) {
-      return { table, row: data as Record<string, unknown> };
+      // Supabase column-union typing — cast through unknown for dynamic column access
+      return { table, row: data as unknown as Record<string, unknown> };
     }
   }
   return null;
@@ -128,7 +129,8 @@ async function buildBreadcrumbs(
     }
 
     currentTable = parentTable;
-    currentRow = parentRow as Record<string, unknown>;
+    // Supabase column-union typing — cast through unknown for dynamic column access
+    currentRow = parentRow as unknown as Record<string, unknown>;
   }
 
   return breadcrumbs;
@@ -351,7 +353,8 @@ export async function PATCH(
 
   const { data: updated, error: updateError } = await adminClient
     .from(table)
-    .update(updatePayload)
+    // Supabase generated types reject Record<string, unknown> for dynamic table updates — cast to never
+    .update(updatePayload as never)
     .eq('id', id)
     .select('id, nombre, estado')
     .single();

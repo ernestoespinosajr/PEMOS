@@ -20,7 +20,7 @@ type HierarchyLevel = (typeof VALID_LEVELS)[number];
  * UUID v4 validation regex.
  */
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * GET /api/hierarchy
@@ -161,7 +161,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase.rpc('get_hierarchy_children', {
     target_level: level,
-    parent_id: parentId ?? null,
+    parent_id: parentId ?? undefined,
   });
 
   if (error) {

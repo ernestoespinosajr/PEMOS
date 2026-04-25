@@ -30,16 +30,16 @@ const createUserSchema = z.object({
   password: z
     .string()
     .min(8, 'La contrasena debe tener al menos 8 caracteres'),
-  role: z.enum(['admin', 'coordinator', 'observer', 'field_worker'], {
-    required_error: 'Selecciona un rol',
+  role: z.enum(['platform_admin', 'admin', 'coordinator', 'observer', 'field_worker'], {
+    message: 'Selecciona un rol',
   }),
 });
 
 const editUserSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
   apellido: z.string().min(1, 'El apellido es requerido'),
-  role: z.enum(['admin', 'coordinator', 'observer', 'field_worker'], {
-    required_error: 'Selecciona un rol',
+  role: z.enum(['platform_admin', 'admin', 'coordinator', 'observer', 'field_worker'], {
+    message: 'Selecciona un rol',
   }),
 });
 

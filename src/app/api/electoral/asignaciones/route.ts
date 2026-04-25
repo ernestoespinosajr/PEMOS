@@ -4,7 +4,7 @@ import { verifyApiAuth } from '@/lib/auth/verify-api-auth';
 import type { Database } from '@/types/supabase';
 
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ---------------------------------------------------------------------------
 // GET /api/electoral/asignaciones
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
     ...new Set((data ?? []).map((a) => (a as Record<string, unknown>).usuario_id as string)),
   ];
 
-  let usuarioMap: Record<string, { nombre: string; apellido: string; email: string }> = {};
+  const usuarioMap: Record<string, { nombre: string; apellido: string; email: string }> = {};
 
   if (usuarioIds.length > 0) {
     const { data: usuarios } = await supabase

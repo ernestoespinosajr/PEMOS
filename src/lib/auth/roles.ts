@@ -5,6 +5,12 @@ import type { UserRole, PermissionAction } from '@/types/auth';
  * Ordered by privilege level (highest first).
  */
 export const ROLES = {
+  platform_admin: {
+    key: 'platform_admin' as const,
+    label: 'Admin Plataforma',
+    description: 'Gestion de tenants y configuracion de la plataforma',
+    level: -1,
+  },
   admin: {
     key: 'admin' as const,
     label: 'Administrador',
@@ -36,15 +42,17 @@ export const ROLES = {
  * to perform it.
  */
 const PERMISSION_MATRIX: Record<PermissionAction, readonly UserRole[]> = {
-  manage_users: ['admin'],
-  view_all_data: ['admin', 'coordinator'],
-  manage_members: ['admin', 'coordinator', 'field_worker'],
-  view_electoral: ['admin', 'coordinator', 'observer'],
-  manage_electoral: ['admin', 'coordinator'],
-  manage_schedules: ['admin', 'coordinator'],
-  manage_seguimiento: ['admin', 'coordinator', 'field_worker'],
-  generate_reports: ['admin', 'coordinator', 'observer'],
-  manage_report_archives: ['admin', 'coordinator'],
+  manage_users: ['platform_admin', 'admin'],
+  view_all_data: ['platform_admin', 'admin', 'coordinator'],
+  manage_members: ['platform_admin', 'admin', 'coordinator', 'field_worker'],
+  view_electoral: ['platform_admin', 'admin', 'coordinator', 'observer'],
+  manage_electoral: ['platform_admin', 'admin', 'coordinator'],
+  manage_schedules: ['platform_admin', 'admin', 'coordinator'],
+  manage_seguimiento: ['platform_admin', 'admin', 'coordinator', 'field_worker'],
+  generate_reports: ['platform_admin', 'admin', 'coordinator', 'observer'],
+  manage_report_archives: ['platform_admin', 'admin', 'coordinator'],
+  manage_tenants: ['platform_admin'],
+  manage_platform: ['platform_admin'],
 };
 
 /**
@@ -56,93 +64,102 @@ const ROUTE_PERMISSIONS: Array<{
   pattern: RegExp;
   roles: readonly UserRole[];
 }> = [
+  // Platform admin-only routes (cross-tenant management)
+  {
+    pattern: /^\/platform/,
+    roles: ['platform_admin'],
+  },
   // Admin-only routes
   {
     pattern: /^\/configuracion\/usuarios/,
-    roles: ['admin'],
+    roles: ['platform_admin', 'admin'],
+  },
+  {
+    pattern: /^\/configuracion\/organizacion/,
+    roles: ['platform_admin', 'admin'],
   },
   {
     pattern: /^\/configuracion\/sistema/,
-    roles: ['admin'],
+    roles: ['platform_admin', 'admin'],
   },
   // Observer assignment management -- admin only
   {
     pattern: /^\/monitoreo\/asignaciones/,
-    roles: ['admin'],
+    roles: ['platform_admin', 'admin'],
   },
   // Coordinator and above
   {
     pattern: /^\/miembros\/(nuevo|editar)/,
-    roles: ['admin', 'coordinator', 'field_worker'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'field_worker'],
   },
   {
     pattern: /^\/recintos\/(nuevo|editar)/,
-    roles: ['admin', 'coordinator'],
+    roles: ['platform_admin', 'admin', 'coordinator'],
   },
   {
     pattern: /^\/candidatos\/(nuevo|editar)/,
-    roles: ['admin', 'coordinator'],
+    roles: ['platform_admin', 'admin', 'coordinator'],
   },
   // Vote recording -- admin, coordinator, observer
   {
     pattern: /^\/monitoreo\/votos/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   // Acta creation -- admin, coordinator, observer
   {
     pattern: /^\/monitoreo\/actas\/nuevo/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   // Acta list -- admin, coordinator, observer
   {
     pattern: /^\/monitoreo\/actas/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   // Turnout tracking -- admin, coordinator, observer
   {
     pattern: /^\/monitoreo\/turnout/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   // Electoral monitoring hub -- observer and above
   {
     pattern: /^\/monitoreo/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   // Recinto and candidato views -- observer and above
   {
     pattern: /^\/recintos/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   {
     pattern: /^\/candidatos/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   // Reports -- all roles with electoral access
   {
     pattern: /^\/reportes\/archivo/,
-    roles: ['admin', 'coordinator'],
+    roles: ['platform_admin', 'admin', 'coordinator'],
   },
   {
     pattern: /^\/reportes/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   {
     pattern: /^\/informes/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   {
     pattern: /^\/estadisticas/,
-    roles: ['admin', 'coordinator', 'observer'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'observer'],
   },
   // Seguimiento no inscritos -- template management (admin only)
   {
     pattern: /^\/seguimiento\/plantillas/,
-    roles: ['admin'],
+    roles: ['platform_admin', 'admin'],
   },
   // Seguimiento no inscritos -- queue and recording
   {
     pattern: /^\/seguimiento/,
-    roles: ['admin', 'coordinator', 'field_worker'],
+    roles: ['platform_admin', 'admin', 'coordinator', 'field_worker'],
   },
 ];
 

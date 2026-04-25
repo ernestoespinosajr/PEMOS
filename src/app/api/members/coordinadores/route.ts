@@ -59,7 +59,7 @@ export async function GET() {
   const supabase = createClient();
 
   const { data, error } = await supabase.rpc('get_coordinadores', {
-    p_tenant_id: authResult.tenantId,
+    p_tenant_id: authResult.tenantId ?? undefined,
   });
 
   if (error) {

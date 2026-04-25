@@ -215,6 +215,7 @@ export async function POST(request: Request) {
   // Step 2: Insert into usuarios table
   const { data: newUser, error: insertError } = await adminClient
     .from('usuarios')
+    // Supabase generated types are stale (missing platform_admin role / nombre field) — cast to never
     .insert({
       nombre,
       apellido,
@@ -225,7 +226,7 @@ export async function POST(request: Request) {
       provincia_id: provincia_id ?? null,
       municipio_id: municipio_id ?? null,
       circunscripcion_id: circunscripcion_id ?? null,
-    })
+    } as never)
     .select()
     .single();
 

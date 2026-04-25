@@ -38,6 +38,11 @@ interface RoleDashboardConfig {
 }
 
 const ROLE_DASHBOARD_CONFIG: Record<UserRole, RoleDashboardConfig> = {
+  platform_admin: {
+    title: 'Panel de Plataforma',
+    subtitle: 'Administracion global de la plataforma',
+    subtitleWithScope: () => 'Administracion global de la plataforma',
+  },
   admin: {
     title: 'Panel de Control',
     subtitle: 'Vista general del sistema',
@@ -81,11 +86,11 @@ type ScopeTableName = (typeof SCOPE_LEVEL_TO_TABLE)[keyof typeof SCOPE_LEVEL_TO_
  * Hook that resolves the current authenticated user's role and geographic
  * scope for dashboard display purposes.
  *
- * The auth system stores role and geographic_scope in JWT custom claims
+ * The auth system stores app_role and geographic_scope in JWT custom claims
  * (injected by the `custom_access_token_hook` Postgres function). This hook:
  *
- * 1. Reads the JWT claims via `supabase.auth.getUser()`
- * 2. Extracts `role` and `geographic_scope` from `app_metadata`
+ * 1. Validates the user via `supabase.auth.getUser()`
+ * 2. Decodes the JWT access token to extract `app_role` and `geographic_scope`
  * 3. If a geographic scope exists, resolves the area name from the database
  * 4. Returns display-ready strings for the dashboard header
  *
@@ -122,15 +127,25 @@ export function useUserScope(): UserScope {
           return;
         }
 
-        // Extract role from JWT custom claims (injected by custom_access_token_hook)
-        // The middleware also reads this same field for route authorization
-        const userRole = (user.app_metadata?.role as UserRole | undefined) ??
-          (user.user_metadata?.role as UserRole | undefined) ??
-          null;
+        // Extract role and scope from JWT custom claims.
+        // The custom_access_token_hook injects 'app_role' (NOT 'role') into the JWT.
+        // To read these claims, we decode the access token from the session.
+        let userRole: UserRole | null = null;
+        let userGeoScope: GeographicScope | null = null;
 
-        // Extract geographic scope from JWT custom claims
-        const userGeoScope = (user.app_metadata?.geographic_scope as GeographicScope | undefined) ??
-          null;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          try {
+            const parts = session.access_token.split('.');
+            const payloadBase64 = parts[1] ?? '';
+            const payloadJson = atob(payloadBase64);
+            const claims = JSON.parse(payloadJson);
+            userRole = (claims.app_role as UserRole | undefined) ?? null;
+            userGeoScope = (claims.geographic_scope as GeographicScope | undefined) ?? null;
+          } catch {
+            // If JWT decode fails, fall through to null values
+          }
+        }
 
         if (cancelled) return;
 

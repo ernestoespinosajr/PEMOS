@@ -8,7 +8,7 @@ import { isValidReportType } from '@/lib/reports/catalog';
 // ---------------------------------------------------------------------------
 
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 25;

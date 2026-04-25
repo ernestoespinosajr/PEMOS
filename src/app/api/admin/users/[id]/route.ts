@@ -113,7 +113,8 @@ export async function PATCH(
 
   const { data: updatedUser, error } = await adminClient
     .from('usuarios')
-    .update(updateData)
+    // Supabase generated types reject Record<string, unknown> here — cast to never for dynamic update payload
+    .update(updateData as never)
     .eq('id', id)
     .select()
     .single();

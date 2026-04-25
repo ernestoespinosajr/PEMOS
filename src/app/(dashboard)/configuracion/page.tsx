@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Settings, Users } from 'lucide-react';
+import { Building2, Settings, Users } from 'lucide-react';
 
 const configSections = [
   {
@@ -8,6 +8,14 @@ const configSections = [
       'Administra usuarios, roles y ambitos geograficos del sistema.',
     href: '/configuracion/usuarios',
     icon: Users,
+    adminOnly: true,
+  },
+  {
+    title: 'Organizacion',
+    description:
+      'Configura el nombre y color de marca de tu organizacion.',
+    href: '/configuracion/organizacion',
+    icon: Building2,
     adminOnly: true,
   },
   {

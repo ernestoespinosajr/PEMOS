@@ -4,7 +4,7 @@ import { verifyApiAuth } from '@/lib/auth/verify-api-auth';
 import type { Database } from '@/types/supabase';
 
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ---------------------------------------------------------------------------
 // GET /api/electoral/actas
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     ),
   ];
 
-  let userMap: Record<string, string> = {};
+  const userMap: Record<string, string> = {};
   if (userIds.length > 0) {
     const { data: usuarios } = await supabase
       .from('usuarios')

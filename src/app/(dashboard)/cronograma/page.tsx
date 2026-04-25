@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, Suspense } from 'react';
+import { useState, useCallback, useMemo, Suspense } from 'react';
 import {
   CalendarDays,
   Clock,
@@ -113,9 +113,26 @@ function CronogramaContent() {
   // Mutations
   const mutations = useEventMutations();
 
+  // Derive the calendar's initial date from the first upcoming event.
+  // When events exist only in a future period (e.g., election year 2028),
+  // the calendar must navigate to that date rather than showing the empty
+  // current month. The upcoming hook fetches ALL future events sorted by
+  // fecha_inicio ascending, so the first item is the nearest future event.
+  const calendarInitialDate = useMemo(() => {
+    const first = upcomingData.events[0];
+    return first?.fecha_inicio;
+  }, [upcomingData.events]);
+
   // Handlers
+  // Guard against redundant range updates: FullCalendar fires datesSet on
+  // every navigation AND on initial mount (and after gotoDate). Without
+  // this check, each fire creates a new calendarRange object which
+  // triggers a refetch even when the dates are identical.
   const handleDatesChange = useCallback((start: string, end: string) => {
-    setCalendarRange({ start, end });
+    setCalendarRange((prev) => {
+      if (prev.start === start && prev.end === end) return prev;
+      return { start, end };
+    });
   }, []);
 
   const handleDateClick = useCallback((dateStr: string) => {
@@ -375,6 +392,7 @@ function CronogramaContent() {
           <DynamicScheduleCalendar
             events={calendarData.calendarEvents}
             isLoading={calendarData.isLoading}
+            initialDate={calendarInitialDate}
             onDateClick={handleDateClick}
             onEventClick={handleEventClick}
             onDatesChange={handleDatesChange}

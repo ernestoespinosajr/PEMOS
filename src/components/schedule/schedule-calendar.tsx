@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -20,6 +20,8 @@ import type { CalendarEvent } from '@/hooks/use-schedule-events';
 interface ScheduleCalendarProps {
   events: CalendarEvent[];
   isLoading?: boolean;
+  /** ISO date string to navigate the calendar to (e.g., first event date). */
+  initialDate?: string;
   onDateClick?: (dateStr: string) => void;
   onEventClick?: (event: ScheduleEvent) => void;
   onDatesChange?: (start: string, end: string) => void;
@@ -43,12 +45,35 @@ interface ScheduleCalendarProps {
 export function ScheduleCalendar({
   events,
   isLoading = false,
+  initialDate,
   onDateClick,
   onEventClick,
   onDatesChange,
   className,
 }: ScheduleCalendarProps) {
   const calendarRef = useRef<FullCalendar>(null);
+
+  // Navigate FullCalendar to the target date when initialDate is provided.
+  // This handles the case where events exist in a future period (e.g., election
+  // year 2028) and the calendar must jump from the current date to show them.
+  // Uses a ref to ensure we only auto-navigate once per distinct initialDate.
+  // The cleanup resets the ref so that React 18 Strict Mode's
+  // unmount-then-remount cycle does not skip the navigation on the second mount.
+  const lastNavigatedDate = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      initialDate &&
+      initialDate !== lastNavigatedDate.current &&
+      calendarRef.current
+    ) {
+      const api = calendarRef.current.getApi();
+      api.gotoDate(initialDate);
+      lastNavigatedDate.current = initialDate;
+    }
+    return () => {
+      lastNavigatedDate.current = null;
+    };
+  }, [initialDate]);
 
   const handleDateClick = useCallback(
     (info: DateClickArg) => {

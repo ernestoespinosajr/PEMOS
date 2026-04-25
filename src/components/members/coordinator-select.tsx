@@ -56,12 +56,13 @@ export function CoordinatorSelect({
       return;
     }
 
+    const selectedId = value;
     async function loadSelected() {
       const supabase = createClient();
       const { data } = await supabase
         .from('miembros')
         .select('id, nombre, apellido, cedula')
-        .eq('id', value)
+        .eq('id', selectedId)
         .single();
 
       if (data) {

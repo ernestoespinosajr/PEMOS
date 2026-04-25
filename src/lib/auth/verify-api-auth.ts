@@ -51,57 +51,69 @@ interface VerifyAuthOptions {
 export async function verifyApiAuth(
   options: VerifyAuthOptions = {}
 ): Promise<AuthResult> {
-  const { includePartido = true } = options;
+  try {
+    const { includePartido = true } = options;
 
-  const supabase = createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+    const supabase = createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  if (authError || !user) {
+    if (authError || !user) {
+      return {
+        authorized: false as const,
+        response: NextResponse.json({ error: 'No autenticado' }, { status: 401 }),
+      };
+    }
+
+    const { data: dbUser, error: dbError } = await supabase
+      .from('usuarios')
+      .select('id, role, tenant_id')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    if (dbError || !dbUser) {
+      console.error('verifyApiAuth: usuarios lookup failed:', dbError?.message ?? 'no row found');
+      return {
+        authorized: false as const,
+        response: NextResponse.json(
+          { error: 'Usuario no encontrado en el sistema' },
+          { status: 403 }
+        ),
+      };
+    }
+
+    // Optionally derive partido_id from the active periodo electoral
+    let partidoId: string | null = null;
+    if (includePartido) {
+      const { data: activePeriodo } = await supabase
+        .from('periodos_electorales')
+        .select('partido_id')
+        .eq('activo', true)
+        .eq('estado', true)
+        .limit(1)
+        .maybeSingle();
+      if (activePeriodo) {
+        partidoId = activePeriodo.partido_id;
+      }
+    }
+
     return {
-      authorized: false as const,
-      response: NextResponse.json({ error: 'No autenticado' }, { status: 401 }),
+      authorized: true as const,
+      tenantId: dbUser.tenant_id as string | null,
+      partidoId,
+      role: dbUser.role as string,
+      authUserId: user.id,
     };
-  }
-
-  const { data: dbUser, error: dbError } = await supabase
-    .from('usuarios')
-    .select('id, role, tenant_id')
-    .eq('auth_user_id', user.id)
-    .single();
-
-  if (dbError || !dbUser) {
+  } catch (err) {
+    console.error('verifyApiAuth: unexpected error:', err);
     return {
       authorized: false as const,
       response: NextResponse.json(
-        { error: 'Usuario no encontrado en el sistema' },
-        { status: 403 }
+        { error: 'Error de autenticacion interno' },
+        { status: 500 }
       ),
     };
   }
-
-  // Optionally derive partido_id from the active periodo electoral
-  let partidoId: string | null = null;
-  if (includePartido) {
-    const { data: activePeriodo } = await supabase
-      .from('periodos_electorales')
-      .select('partido_id')
-      .eq('activo', true)
-      .eq('estado', true)
-      .limit(1)
-      .maybeSingle();
-    if (activePeriodo) {
-      partidoId = activePeriodo.partido_id;
-    }
-  }
-
-  return {
-    authorized: true as const,
-    tenantId: dbUser.tenant_id as string | null,
-    partidoId,
-    role: dbUser.role as string,
-    authUserId: user.id,
-  };
 }

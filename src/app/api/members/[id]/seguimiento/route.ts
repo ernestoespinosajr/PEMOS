@@ -7,7 +7,7 @@ import type { CreateSeguimientoPayload, SeguimientoTipo } from '@/types/member';
 // ---------------------------------------------------------------------------
 
 const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const VALID_TIPOS: SeguimientoTipo[] = [
   'llamada', 'visita', 'mensaje', 'reunion', 'otro',
@@ -223,7 +223,8 @@ export async function POST(
 
   const { data: newEntry, error } = await supabase
     .from('seguimiento_miembros')
-    .insert(insertData)
+    // Supabase generated types reject Record<string, unknown> for dynamic insert payload — cast to never
+    .insert(insertData as never)
     .select()
     .single();
 

@@ -48,9 +48,13 @@ async function fetchEntities(
 
   let query = supabase.from(table).select('*').order('nombre');
 
-  // Filter by parent if applicable
+  // Filter by parent if applicable.
+  // parentFk is statically paired with `table` by construction in LEVEL_PARENT_FK,
+  // but the union-typed query loses that link. Cast to `never` (the intersection
+  // of valid column names across the table union) so .eq() accepts it. Safe because
+  // LEVEL_PARENT_FK guarantees the FK exists on the resolved table.
   if (parentFk && parentId) {
-    query = query.eq(parentFk, parentId);
+    query = query.eq(parentFk as never, parentId);
   }
 
   const { data, error } = await query;
@@ -136,11 +140,16 @@ async function buildBreadcrumb(
     const table = LEVEL_TABLE[currentLevel];
     const parentFk = LEVEL_PARENT_FK[currentLevel];
 
-    const { data } = await supabase
+    // Dynamic select string + dynamic table breaks the typed union; cast the
+    // select arg to `never` so column-name validation collapses. Safe because
+    // `id` and `nombre` exist on every hierarchy table by construction, and
+    // `parentFk` (when set) is the FK column for this exact table. Result is
+    // re-typed to a generic record so downstream property access stays sound.
+    const { data } = (await supabase
       .from(table)
-      .select('id, nombre' + (parentFk ? `, ${parentFk}` : ''))
-      .eq('id', currentId)
-      .single();
+      .select(('id, nombre' + (parentFk ? `, ${parentFk}` : '')) as never)
+      .eq('id' as never, currentId)
+      .single()) as { data: Record<string, unknown> | null };
 
     if (!data) break;
 
@@ -233,7 +242,7 @@ function JerarquiaContent() {
   // Parent name for the create dialog
   const parentName =
     breadcrumb.length > 0
-      ? breadcrumb[breadcrumb.length - 1].label
+      ? breadcrumb[breadcrumb.length - 1]?.label ?? null
       : null;
 
   // ---------- Data Fetching ----------
@@ -323,7 +332,8 @@ function JerarquiaContent() {
       .single();
 
     if (data) {
-      const pId = (data as Record<string, unknown>)[parentFk] as string;
+      // Supabase column-union typing — cast through unknown to read the dynamic FK column
+      const pId = (data as unknown as Record<string, unknown>)[parentFk] as string;
       navigateTo(level, pId);
     }
   }

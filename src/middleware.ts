@@ -13,6 +13,7 @@ const PUBLIC_PATHS = [
   '/update-password',
   '/api/auth',
   '/forbidden',
+  '/suspended',
 ];
 
 /**
@@ -54,10 +55,37 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Extract role from JWT custom claims
-  // The custom_access_token_hook injects role into the access token claims
-  const role = (user.app_metadata?.role as UserRole | undefined) ??
-    (user.user_metadata?.role as UserRole | undefined);
+  // Extract role from JWT custom claims.
+  // The custom_access_token_hook injects 'app_role' (NOT 'role') into the JWT.
+  // The JWT 'role' claim must stay 'authenticated' for PostgREST.
+  // To read custom JWT claims, we decode the access token from the session.
+  let role: UserRole | undefined;
+  let tenantSuspended = false;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    try {
+      // Decode JWT payload (base64url) without verification — Supabase
+      // already validated the token via getUser() above.
+      const parts = session.access_token.split('.');
+      const payloadBase64 = parts[1] ?? '';
+      const payloadJson = Buffer.from(payloadBase64, 'base64url').toString('utf-8');
+      const claims = JSON.parse(payloadJson);
+      role = claims.app_role as UserRole | undefined;
+      tenantSuspended = claims.tenant_suspended === true;
+    } catch {
+      // If JWT decode fails, role stays undefined — route auth will be skipped
+      // but data access is still protected by RLS at the database level.
+    }
+  }
+
+  // Check if tenant is suspended
+  // The custom_access_token_hook sets tenant_suspended: true when tenants.activo = false
+  // Platform admins are exempt -- they operate at the platform level and must retain
+  // access even when their associated tenant (if any) is suspended.
+  if (tenantSuspended && role !== 'platform_admin') {
+    return NextResponse.redirect(new URL('/suspended', request.url));
+  }
 
   // Check route-level authorization
   if (role && !canAccessRoute(role, pathname)) {

@@ -32,6 +32,12 @@ interface RoleVisualConfig {
 }
 
 const ROLE_VISUALS: Record<UserRole, RoleVisualConfig> = {
+  platform_admin: {
+    icon: Shield,
+    badgeBg: 'bg-primary-tint',
+    badgeText: 'text-primary',
+    badgeIcon: 'text-primary',
+  },
   admin: {
     icon: Shield,
     badgeBg: 'bg-primary-tint',
