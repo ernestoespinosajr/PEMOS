@@ -2,7 +2,7 @@
 -- PEMOS Test Data Seed
 -- =============================================================================
 -- Creates a complete test environment with:
---   - 1 auth user (test@mail.com / Test1234, role: admin)
+--   - 1 auth user (test@mail.com, role: admin) -- password supplied at runtime
 --   - 1 tenant party (PAND - Partido Alianza Nacional Dominicana)
 --   - 12 circunscripciones, 22 sectores, 12 recintos, 21 colegios
 --   - 40 members (6 coordinadores, 8 multiplicadores, 26 relacionados)
@@ -16,7 +16,24 @@
 --   - Geographic seed data (provincias, municipios) already loaded
 --
 -- Usage:
---   Run via Supabase MCP execute_sql or psql
+--   The dev test user is already provisioned in the deployed Supabase project
+--   and is normally NOT recreated by this seed. If you need to re-run this
+--   seed against a fresh local/dev database, supply the test user password
+--   via the `app.test_user_password` GUC before executing this file. Examples:
+--
+--     # psql one-off (set for the session, then run the seed):
+--     psql "$DATABASE_URL" \
+--       -v ON_ERROR_STOP=1 \
+--       -c "SET app.test_user_password = 'choose-a-strong-local-password';" \
+--       -f supabase/seed-test-data.sql
+--
+--     # or export it once and let the SET below pick it up:
+--     PGOPTIONS="-c app.test_user_password=choose-a-strong-local-password" \
+--       psql "$DATABASE_URL" -f supabase/seed-test-data.sql
+--
+--   Never commit a real password literal here. If the GUC is unset, the seed
+--   generates a random password — you will then need to reset it via the
+--   Supabase auth admin API before logging in.
 --
 -- Tenant ID: a0000000-0000-0000-0000-000000000001
 -- Auth User ID: c0000000-0000-0000-0000-000000000001
@@ -71,6 +88,11 @@ UPDATE partidos SET tenant_id = 'a0000000-0000-0000-0000-000000000001' WHERE ten
 -- =============================================================================
 -- STEP 2: Auth User
 -- =============================================================================
+-- The password is sourced from the `app.test_user_password` GUC (see header
+-- usage notes). If unset, fall back to a random 32-char value so the row is
+-- still creatable in a fresh environment without leaking a known credential
+-- through version control. Operators must reset the password out-of-band
+-- (e.g. via the Supabase auth admin API) before signing in with this user.
 INSERT INTO auth.users (
     id, instance_id, aud, role, email, encrypted_password,
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
@@ -80,7 +102,13 @@ VALUES (
     'c0000000-0000-0000-0000-000000000001',
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated', 'test@mail.com',
-    crypt('Test1234', gen_salt('bf')),
+    crypt(
+        coalesce(
+            nullif(current_setting('app.test_user_password', true), ''),
+            encode(gen_random_bytes(24), 'base64')
+        ),
+        gen_salt('bf')
+    ),
     now(),
     '{"provider": "email", "providers": ["email"]}'::jsonb,
     '{"nombre": "Ernesto", "apellido": "Prueba"}'::jsonb,
