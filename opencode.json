@@ -1,0 +1,187 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openai/gpt-5.4",
+  "small_model": "openai/gpt-5.4-mini",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen3:14b": {
+          "name": "Qwen3 14B (local)",
+          "limit": {
+            "context": 16384,
+            "output": 4096
+          }
+        }
+      }
+    },
+    "openai": {
+      "options": {
+        "baseURL": "https://api.chatgpt.com/v1"
+      },
+      "models": {
+        "gpt-5.4": {
+          "name": "GPT-5.4",
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "gpt-5.4-mini": {
+          "name": "GPT-5.4 Mini",
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        }
+      }
+    },
+    "anthropic": {
+      "options": {},
+      "models": {
+        "claude-opus-4-7": {
+          "name": "Claude Opus 4.7",
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "claude-sonnet-4-6": {
+          "name": "Claude Sonnet 4.6",
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  },
+  "plugin": [],
+  "agent": {
+    "orchestrator": {
+      "mode": "primary",
+      "description": "Ernie - Project orchestrator. FAST routing only. NEVER executes work directly.",
+      "model": "anthropic/claude-sonnet-4-6",
+      "temperature": 0.2,
+      "maxSteps": 15,
+      "permission": {
+        "task": {
+          "*": "allow"
+        },
+        "skill": {
+          "*": "allow"
+        },
+        "edit": "deny",
+        "bash": "deny"
+      }
+    },
+    "backend": {
+      "mode": "subagent",
+      "description": "Backend specialist - Supabase, database, API routes, server logic.",
+      "model": "anthropic/claude-sonnet-4-6",
+      "temperature": 0.2,
+      "maxSteps": 60,
+      "prompt": "Backend specialist for PEMOS. Work with Supabase, database schema, API routes, server-side logic. SQL, TypeScript, Next.js API routes."
+    },
+    "frontend": {
+      "mode": "subagent",
+      "description": "Frontend specialist - React, Next.js, UI components, Tailwind.",
+      "model": "anthropic/claude-sonnet-4-6",
+      "temperature": 0.3,
+      "maxSteps": 60,
+      "prompt": "Frontend specialist. Work with React, Next.js, Tailwind CSS, UI components, pages. Responsive design, accessibility."
+    },
+    "build": {
+      "mode": "subagent",
+      "description": "Build agent - code changes, features, fixes. Main coding workhorse.",
+      "model": "anthropic/claude-sonnet-4-6",
+      "temperature": 0.3,
+      "maxSteps": 60,
+      "prompt": "Execute code changes, create features, fix bugs in PEMOS. Quality over speed."
+    },
+    "plan": {
+      "mode": "subagent",
+      "description": "Planning agent - create plans without changes.",
+      "model": "openai/gpt-5.4-mini",
+      "temperature": 0.1,
+      "maxSteps": 15,
+      "permission": {
+        "edit": "deny",
+        "bash": "deny"
+      }
+    },
+    "explore": {
+      "mode": "subagent",
+      "description": "Exploration agent - find files, understand structure. READ-ONLY.",
+      "model": "openai/gpt-5.4-mini",
+      "temperature": 0.1,
+      "maxSteps": 10,
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "ls": "allow",
+          "find": "allow",
+          "grep": "allow"
+        }
+      }
+    },
+    "research": {
+      "mode": "subagent",
+      "description": "Research agent - web search, documentation, framework. IMAGE support.",
+      "model": "openai/gpt-5.4",
+      "temperature": 0.4,
+      "maxSteps": 20
+    },
+    "review": {
+      "mode": "subagent",
+      "description": "Code review - quality gates, security, best practices. Main quality gate.",
+      "model": "anthropic/claude-sonnet-4-6",
+      "temperature": 0.1,
+      "maxSteps": 30,
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "git diff": "allow",
+          "git status": "allow"
+        }
+      }
+    },
+    "database": {
+      "mode": "subagent",
+      "description": "Database specialist - Supabase migrations, schema changes, SQL.",
+      "model": "anthropic/claude-sonnet-4-6",
+      "temperature": 0.2,
+      "maxSteps": 40,
+      "prompt": "Work with Supabase database. Schema migrations, SQL functions, triggers, RLS policies."
+    },
+    "design": {
+      "mode": "subagent",
+      "description": "Design/UI - component design, user experience.",
+      "model": "anthropic/claude-sonnet-4-6",
+      "temperature": 0.3,
+      "maxSteps": 30,
+      "prompt": "Design UI components, user experience improvements, Tailwind styling."
+    },
+    "debugger": {
+      "mode": "subagent",
+      "description": "DEBUGGER - Only called when build/review fails. Deep debugging, complex issues. ESCALATION ONLY.",
+      "model": "anthropic/claude-opus-4-7",
+      "temperature": 0.1,
+      "maxSteps": 40,
+      "prompt": "You are the debugger specialist. Called ONLY when other agents fail. Analyze the issue deeply, find root cause, provide detailed fix."
+    }
+  },
+  "permission": {
+    "skill": {
+      "*": "allow"
+    },
+    "edit": "ask",
+    "bash": "ask"
+  }
+}
