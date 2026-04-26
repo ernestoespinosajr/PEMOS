@@ -2,11 +2,15 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import {
   BarChart3,
+  Building2,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Flag,
   LayoutDashboard,
   LogOut,
@@ -15,10 +19,12 @@ import {
   Network,
   Settings,
   FileText,
+  UserSearch,
   Users,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTenantBranding } from '@/components/layout/tenant-branding-provider';
 import type { NavSection } from '@/types';
 
 interface SidebarProps {
@@ -57,7 +63,6 @@ const navSections: NavSection[] = [
         title: 'Monitoreo',
         href: '/monitoreo',
         icon: Monitor,
-        badge: 3,
       },
       {
         title: 'Recintos',
@@ -69,11 +74,26 @@ const navSections: NavSection[] = [
         href: '/candidatos',
         icon: Flag,
       },
+      {
+        title: 'No Inscritos',
+        href: '/seguimiento',
+        icon: UserSearch,
+      },
+      {
+        title: 'Cronograma',
+        href: '/cronograma',
+        icon: CalendarDays,
+      },
     ],
   },
   {
     label: 'Reportes',
     items: [
+      {
+        title: 'Reportes',
+        href: '/reportes',
+        icon: ClipboardList,
+      },
       {
         title: 'Informes',
         href: '/informes',
@@ -90,6 +110,16 @@ const navSections: NavSection[] = [
 
 const bottomItems = [
   {
+    title: 'Usuarios',
+    href: '/configuracion/usuarios',
+    icon: Users,
+  },
+  {
+    title: 'Organizacion',
+    href: '/configuracion/organizacion',
+    icon: Building2,
+  },
+  {
     title: 'Configuracion',
     href: '/configuracion',
     icon: Settings,
@@ -104,11 +134,23 @@ export function Sidebar({
   onCloseMobile,
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { branding } = useTenantBranding();
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
+
+  const logoSrc = branding.logo_url || '/logo.svg';
+  const brandName = branding.nombre || 'PEMOS';
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -121,18 +163,25 @@ export function Sidebar({
       >
         <Link
           href="/"
-          className="flex items-center gap-space-2"
+          className="flex items-center gap-space-2 min-w-0"
           onClick={isMobile ? onCloseMobile : undefined}
         >
           <Image
-            src="/logo.svg"
-            alt="PEMOS"
+            src={logoSrc}
+            alt={brandName}
             width={28}
             height={28}
-            className="flex-shrink-0"
+            className="flex-shrink-0 rounded"
+            onError={(e) => {
+              // Fallback to default logo on error
+              const target = e.currentTarget;
+              target.src = '/logo.svg';
+            }}
           />
           {(!isCollapsed || isMobile) && (
-            <span className="text-lg font-bold text-primary-text">PEMOS</span>
+            <span className="truncate text-lg font-bold text-primary-text">
+              {brandName}
+            </span>
           )}
         </Link>
 
@@ -254,6 +303,7 @@ export function Sidebar({
           {/* Cerrar Sesion */}
           <li>
             <button
+              onClick={handleSignOut}
               className={cn(
                 'group flex w-full items-center rounded-md py-space-3 text-body-text transition-colors duration-hover hover:bg-neutral-100 hover:text-primary-text',
                 isCollapsed && !isMobile
