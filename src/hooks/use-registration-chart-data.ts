@@ -26,24 +26,20 @@ export interface RegistrationChartDataState {
 
 // ---------- Cache ----------
 
-const cache: {
-  data: RegistrationDataPoint[] | null;
-  period: PeriodOption | null;
-  timestamp: number;
-} = {
-  data: null,
-  period: null,
-  timestamp: 0,
-};
+type RegCacheKey = `${PeriodOption}:${string}`;
+
+/** Keyed by `period:movimientoId` to prevent cross-scope cache hits. */
+const cache = new Map<RegCacheKey, { data: RegistrationDataPoint[]; timestamp: number }>();
 
 const STALE_TIME = 30_000; // 30 seconds
 
-function isCacheValid(period: PeriodOption): boolean {
-  return (
-    cache.data !== null &&
-    cache.period === period &&
-    Date.now() - cache.timestamp < STALE_TIME
-  );
+function buildCacheKey(period: PeriodOption, movimientoId: string | null): RegCacheKey {
+  return `${period}:${movimientoId ?? 'null'}`;
+}
+
+function isCacheValid(period: PeriodOption, movimientoId: string | null): boolean {
+  const entry = cache.get(buildCacheKey(period, movimientoId));
+  return entry != null && Date.now() - entry.timestamp < STALE_TIME;
 }
 
 // ---------- Helpers ----------
@@ -109,9 +105,13 @@ function toDateString(d: Date): string {
  * - Attempts RPC `get_registration_daily` first, falls back to direct query
  *
  * @param period - The selected time period
+ * @param movimientoId - The user's movimiento scope from JWT. Non-null for
+ *   scoped users; null for tenant-wide admins. Applied as an explicit filter
+ *   for admin-role users (RLS does not scope admin).
  */
 export function useRegistrationChartData(
-  period: PeriodOption
+  period: PeriodOption,
+  movimientoId: string | null = null
 ): RegistrationChartDataState {
   const [data, setData] = useState<RegistrationDataPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,8 +120,8 @@ export function useRegistrationChartData(
 
   const fetchData = useCallback(
     async (skipCache = false) => {
-      if (!skipCache && isCacheValid(period)) {
-        setData(cache.data!);
+      if (!skipCache && isCacheValid(period, movimientoId)) {
+        setData(cache.get(buildCacheKey(period, movimientoId))!.data);
         setIsLoading(false);
         setError(null);
         return;
@@ -142,11 +142,12 @@ export function useRegistrationChartData(
 
         let dailyCounts: Array<{ date: string; count: number }> = [];
 
-        // Try RPC function first (materialized view with security wrapper)
-        // The RPC may not be in the generated types yet -- cast to bypass strict typing
+        // Try RPC function first (materialized view with security wrapper).
+        // Pass movimientoId so the RPC can scope its aggregation for scoped admins.
+        // The RPC may not be in the generated types yet -- cast to bypass strict typing.
         const rpcResult = await (supabase.rpc as CallableFunction)(
           'get_registration_daily',
-          { p_date_from: startDate, p_date_to: endDate }
+          { p_date_from: startDate, p_date_to: endDate, p_movimiento_id: movimientoId ?? null }
         );
 
         if (
@@ -170,12 +171,15 @@ export function useRegistrationChartData(
             rpcResult.error?.message
           );
 
-          const { data: members, error: membersError } = await supabase
+          const fallbackQuery = supabase
             .from('miembros')
             .select('created_at')
             .gte('created_at', start.toISOString())
             .lte('created_at', end.toISOString())
             .order('created_at', { ascending: true });
+          const { data: members, error: membersError } = await (movimientoId
+            ? fallbackQuery.eq('movimiento_id', movimientoId)
+            : fallbackQuery);
 
           if (membersError) {
             console.warn('Direct query failed:', membersError.message);
@@ -227,10 +231,8 @@ export function useRegistrationChartData(
           );
         }
 
-        // Update cache
-        cache.data = sampledData;
-        cache.period = period;
-        cache.timestamp = Date.now();
+        // Update scope-keyed cache
+        cache.set(buildCacheKey(period, movimientoId), { data: sampledData, timestamp: Date.now() });
 
         setData(sampledData);
         setError(null);
@@ -244,7 +246,7 @@ export function useRegistrationChartData(
         }
       }
     },
-    [period]
+    [period, movimientoId]
   );
 
   useEffect(() => {

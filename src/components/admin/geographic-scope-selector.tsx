@@ -166,7 +166,6 @@ export function GeographicScopeSelector({
           value={provinciaId ?? ''}
           onChange={handleProvinciaChange}
           disabled={disabled || loadingProvincias}
-          placeholder="Seleccionar provincia"
         >
           <option value="">Sin asignar (todo el pais)</option>
           {provincias.map((p) => (
@@ -194,7 +193,6 @@ export function GeographicScopeSelector({
             value={municipioId ?? ''}
             onChange={handleMunicipioChange}
             disabled={disabled || loadingMunicipios}
-            placeholder="Seleccionar municipio"
           >
             <option value="">Toda la provincia</option>
             {municipios.map((m) => (
@@ -223,7 +221,6 @@ export function GeographicScopeSelector({
             value={circunscripcionId ?? ''}
             onChange={handleCircunscripcionChange}
             disabled={disabled || loadingCircunscripciones}
-            placeholder="Seleccionar circunscripcion"
           >
             <option value="">Todo el municipio</option>
             {circunscripciones.map((c) => (

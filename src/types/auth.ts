@@ -15,7 +15,7 @@
  * - observer: Read-only access to electoral data and reports
  * - field_worker: Limited access for field data entry and member management
  */
-export type UserRole = 'platform_admin' | 'admin' | 'coordinator' | 'observer' | 'field_worker';
+export type UserRole = 'platform_admin' | 'admin' | 'supervisor' | 'coordinator' | 'observer' | 'field_worker';
 
 /**
  * Geographic hierarchy levels in the Dominican political system.
@@ -65,6 +65,8 @@ export interface CustomClaims {
   geographic_scope: GeographicScope | null;
   tenant_config?: TenantConfig;
   tenant_suspended?: boolean;
+  movimiento_id?: string | null;
+  force_password_change?: boolean;
 }
 
 /**
@@ -77,6 +79,8 @@ export interface AuthUser {
   role: UserRole;
   tenant_id: string;
   geographic_scope: GeographicScope | null;
+  movimiento_id?: string | null;
+  force_password_change?: boolean;
 }
 
 /**
@@ -93,4 +97,5 @@ export type PermissionAction =
   | 'generate_reports'
   | 'manage_report_archives'
   | 'manage_tenants'
-  | 'manage_platform';
+  | 'manage_platform'
+  | 'manage_movimientos';

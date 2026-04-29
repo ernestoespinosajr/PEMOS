@@ -17,6 +17,12 @@ export const ROLES = {
     description: 'Acceso completo al sistema',
     level: 0,
   },
+  supervisor: {
+    key: 'supervisor' as const,
+    label: 'Supervisor',
+    description: 'Acceso de lectura a su organizacion',
+    level: 1.5,
+  },
   coordinator: {
     key: 'coordinator' as const,
     label: 'Coordinador',
@@ -53,6 +59,7 @@ const PERMISSION_MATRIX: Record<PermissionAction, readonly UserRole[]> = {
   manage_report_archives: ['platform_admin', 'admin', 'coordinator'],
   manage_tenants: ['platform_admin'],
   manage_platform: ['platform_admin'],
+  manage_movimientos: ['platform_admin', 'admin'],
 };
 
 /**
@@ -64,6 +71,16 @@ const ROUTE_PERMISSIONS: Array<{
   pattern: RegExp;
   roles: readonly UserRole[];
 }> = [
+  // Movimientos create/edit — admin only
+  {
+    pattern: /^\/movimientos\/(nuevo|editar)/,
+    roles: ['platform_admin', 'admin'],
+  },
+  // Movimientos list/detail — all roles can view (data scoped by RLS)
+  {
+    pattern: /^\/movimientos/,
+    roles: ['platform_admin', 'admin', 'supervisor', 'coordinator', 'field_worker'],
+  },
   // Platform admin-only routes (cross-tenant management)
   {
     pattern: /^\/platform/,

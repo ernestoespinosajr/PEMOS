@@ -27,6 +27,10 @@ export interface UserScope {
   isLoading: boolean;
   /** Error message if scope resolution fails. */
   error: string | null;
+  /** The movimiento_id from JWT claims. Null if not scoped to a movimiento. */
+  movimientoId: string | null;
+  /** Resolved name of the movimiento. Null if not scoped. */
+  movimientoNombre: string | null;
 }
 
 // ---------- Role-based display configuration ----------
@@ -47,6 +51,11 @@ const ROLE_DASHBOARD_CONFIG: Record<UserRole, RoleDashboardConfig> = {
     title: 'Panel de Control',
     subtitle: 'Vista general del sistema',
     subtitleWithScope: () => 'Vista general del sistema',
+  },
+  supervisor: {
+    title: 'Mi Movimiento',
+    subtitle: 'Vista de tu movimiento asignado',
+    subtitleWithScope: (scope) => `Movimiento: ${scope}`,
   },
   coordinator: {
     title: 'Mi Area',
@@ -103,6 +112,8 @@ export function useUserScope(): UserScope {
   const [role, setRole] = useState<UserRole | null>(null);
   const [geographicScope, setGeographicScope] = useState<GeographicScope | null>(null);
   const [scopeName, setScopeName] = useState<string | null>(null);
+  const [movimientoId, setMovimientoId] = useState<string | null>(null);
+  const [movimientoNombre, setMovimientoNombre] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -142,6 +153,25 @@ export function useUserScope(): UserScope {
             const claims = JSON.parse(payloadJson);
             userRole = (claims.app_role as UserRole | undefined) ?? null;
             userGeoScope = (claims.geographic_scope as GeographicScope | undefined) ?? null;
+            const movId = (claims.movimiento_id as string | null | undefined) ?? null;
+
+            if (!cancelled) {
+              setMovimientoId(movId);
+            }
+
+            if (movId && !cancelled) {
+              try {
+                const res = await fetch(`/api/movimientos/${movId}`);
+                if (res.ok) {
+                  const json = await res.json();
+                  if (!cancelled) {
+                    setMovimientoNombre(json.data?.nombre ?? null);
+                  }
+                }
+              } catch {
+                // Non-fatal
+              }
+            }
           } catch {
             // If JWT decode fails, fall through to null values
           }
@@ -199,10 +229,16 @@ export function useUserScope(): UserScope {
 
   const scopeDescription = buildScopeDescription(geographicScope, scopeName);
 
+  // For movimiento-scoped users (supervisor / scoped admin) use the movimiento
+  // name as the scope description when no geographic scope is present.
+  const effectiveScopeDescription =
+    scopeDescription ??
+    (movimientoNombre && role === 'supervisor' ? movimientoNombre : null);
+
   const config = role ? ROLE_DASHBOARD_CONFIG[role] : null;
   const dashboardTitle = config?.title ?? 'Dashboard';
-  const dashboardSubtitle = scopeDescription
-    ? config?.subtitleWithScope(scopeDescription) ?? ''
+  const dashboardSubtitle = effectiveScopeDescription
+    ? config?.subtitleWithScope(effectiveScopeDescription) ?? ''
     : config?.subtitle ?? 'Resumen general del sistema de monitoreo electoral';
 
   return {
@@ -215,6 +251,8 @@ export function useUserScope(): UserScope {
     dashboardSubtitle,
     isLoading,
     error,
+    movimientoId,
+    movimientoNombre,
   };
 }
 

@@ -61,6 +61,7 @@ export async function middleware(request: NextRequest) {
   // To read custom JWT claims, we decode the access token from the session.
   let role: UserRole | undefined;
   let tenantSuspended = false;
+  let forcePasswordChange = false;
 
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
@@ -73,6 +74,7 @@ export async function middleware(request: NextRequest) {
       const claims = JSON.parse(payloadJson);
       role = claims.app_role as UserRole | undefined;
       tenantSuspended = claims.tenant_suspended === true;
+      forcePasswordChange = claims.force_password_change === true;
     } catch {
       // If JWT decode fails, role stays undefined — route auth will be skipped
       // but data access is still protected by RLS at the database level.
@@ -85,6 +87,12 @@ export async function middleware(request: NextRequest) {
   // access even when their associated tenant (if any) is suspended.
   if (tenantSuspended && role !== 'platform_admin') {
     return NextResponse.redirect(new URL('/suspended', request.url));
+  }
+
+  // Force password change: redirect to update-password page before anything else.
+  // Applies to all authenticated users except when already on the update-password path.
+  if (forcePasswordChange && pathname !== '/update-password') {
+    return NextResponse.redirect(new URL('/update-password?forced=true', request.url));
   }
 
   // Check route-level authorization

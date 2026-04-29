@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, UserX, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, UserX, Loader2, KeyRound, Building2 } from 'lucide-react';
 import { ROLES } from '@/lib/auth/roles';
 import { cn } from '@/lib/utils';
 import type { AdminUser } from '@/types/admin';
@@ -28,6 +28,7 @@ import type { UserRole } from '@/types/auth';
 const ROLE_BADGE_STYLES: Record<UserRole, string> = {
   platform_admin: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
   admin: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+  supervisor: 'bg-teal-100 text-teal-800 hover:bg-teal-100',
   coordinator: 'bg-green-100 text-green-800 hover:bg-green-100',
   observer: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
   field_worker: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
@@ -58,6 +59,8 @@ interface UsersTableProps {
   loading: boolean;
   onEdit: (user: AdminUser) => void;
   onDeactivate: (user: AdminUser) => void;
+  onChangePassword?: (user: AdminUser) => void;
+  onReasignarMovimiento?: (user: AdminUser) => void;
 }
 
 export function UsersTable({
@@ -65,6 +68,8 @@ export function UsersTable({
   loading,
   onEdit,
   onDeactivate,
+  onChangePassword,
+  onReasignarMovimiento,
 }: UsersTableProps) {
   if (loading) {
     return (
@@ -101,6 +106,9 @@ export function UsersTable({
               <TableHead>Estado</TableHead>
               <TableHead className="hidden lg:table-cell">
                 Ambito geografico
+              </TableHead>
+              <TableHead className="hidden xl:table-cell">
+                Movimiento
               </TableHead>
               <TableHead className="w-[60px]">
                 <span className="sr-only">Acciones</span>
@@ -153,6 +161,11 @@ export function UsersTable({
                   {getGeographicScopeLabel(user)}
                 </TableCell>
 
+                {/* Movimiento */}
+                <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
+                  {user.movimiento_nombre ?? '— Org. Principal'}
+                </TableCell>
+
                 {/* Actions */}
                 <TableCell>
                   <DropdownMenu>
@@ -173,6 +186,18 @@ export function UsersTable({
                         <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
                         Editar
                       </DropdownMenuItem>
+                      {onChangePassword && (
+                        <DropdownMenuItem onClick={() => onChangePassword(user)}>
+                          <KeyRound className="mr-2 h-4 w-4" aria-hidden="true" />
+                          Cambiar Contrasena
+                        </DropdownMenuItem>
+                      )}
+                      {onReasignarMovimiento && (
+                        <DropdownMenuItem onClick={() => onReasignarMovimiento(user)}>
+                          <Building2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                          Reasignar Movimiento
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       {user.estado ? (
                         <DropdownMenuItem
@@ -238,6 +263,18 @@ export function UsersTable({
                     <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
                     Editar
                   </DropdownMenuItem>
+                  {onChangePassword && (
+                    <DropdownMenuItem onClick={() => onChangePassword(user)}>
+                      <KeyRound className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Cambiar Contrasena
+                    </DropdownMenuItem>
+                  )}
+                  {onReasignarMovimiento && (
+                    <DropdownMenuItem onClick={() => onReasignarMovimiento(user)}>
+                      <Building2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Reasignar Movimiento
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   {user.estado ? (
                     <DropdownMenuItem
@@ -285,6 +322,9 @@ export function UsersTable({
 
             <p className="mt-2 text-xs text-muted-foreground">
               {getGeographicScopeLabel(user)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {user.movimiento_nombre ? `Movimiento: ${user.movimiento_nombre}` : 'Org. Principal'}
             </p>
           </article>
         ))}

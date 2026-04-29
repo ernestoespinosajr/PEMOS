@@ -35,10 +35,10 @@ function normalizeCedula(cedula: string): string | null {
 
 /**
  * Verifies the requesting user is authenticated and returns their
- * tenant_id and usuario record id.
+ * tenant_id, usuario record id, role, and movimiento_id.
  */
 async function verifyAuth(): Promise<
-  | { authorized: true; tenantId: string | null; usuarioId: string; role: string }
+  | { authorized: true; tenantId: string | null; usuarioId: string; role: string; movimientoId: string | null }
   | { authorized: false; response: NextResponse }
 > {
   try {
@@ -60,7 +60,8 @@ async function verifyAuth(): Promise<
 
     const { data: dbUser, error: dbError } = await supabase
       .from('usuarios')
-      .select('id, role, tenant_id')
+      // movimiento_id is not in stale generated types — cast to access new column
+      .select('id, role, tenant_id, movimiento_id' as 'id, role, tenant_id')
       .eq('auth_user_id', user.id)
       .single();
 
@@ -75,11 +76,13 @@ async function verifyAuth(): Promise<
       };
     }
 
+    const dbUserAny = dbUser as unknown as Record<string, unknown>;
     return {
       authorized: true,
-      tenantId: dbUser.tenant_id,
-      usuarioId: dbUser.id,
-      role: dbUser.role,
+      tenantId: dbUserAny.tenant_id as string | null,
+      usuarioId: dbUserAny.id as string,
+      role: dbUserAny.role as string,
+      movimientoId: (dbUserAny.movimiento_id as string | null | undefined) ?? null,
     };
   } catch (err) {
     console.error('verifyAuth: unexpected error:', err);
@@ -307,13 +310,21 @@ export async function POST(request: Request) {
       created_by: authResult.usuarioId,
     };
 
+    // If the caller is scoped to a movimiento, enforce it — the caller cannot
+    // override this; their members must belong to their movimiento.
+    if (authResult.movimientoId !== null) {
+      insertData.movimiento_id = authResult.movimientoId;
+    } else if (body.movimiento_id) {
+      // Tenant-level admin can explicitly assign a movimiento
+      insertData.movimiento_id = body.movimiento_id;
+    }
+
     // Optional string fields
     const stringFields = [
       'apodo', 'sexo', 'fecha_nacimiento', 'ocupacion', 'trabajo',
       'email', 'direccion', 'direccion_actual', 'sector_actual',
       'coordinador_id', 'sector_id', 'comite_id', 'nivel_intermedio_id',
-      'recinto_id', 'colegio', 'colegio_ubicacion', 'movimiento_id',
-      'tipo_movimiento',
+      'recinto_id', 'colegio', 'colegio_ubicacion', 'tipo_movimiento',
     ] as const;
 
     for (const field of stringFields) {

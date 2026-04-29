@@ -61,7 +61,10 @@ export async function GET() {
 
   const adminClient = createAdminClient();
 
-  const { data: users, error } = await adminClient
+  // Scope the query to the calling admin's tenant so that service-role access
+  // via adminClient does not inadvertently return users from other tenants.
+  // verifyAdmin() already validates the caller is admin and returns their tenantId.
+  const usersQuery = adminClient
     .from('usuarios')
     .select(
       `
@@ -83,6 +86,13 @@ export async function GET() {
     `
     )
     .order('created_at', { ascending: false });
+
+  // platform_admin has no tenant_id; all other admins must be scoped to their tenant
+  if (authResult.tenantId) {
+    usersQuery.eq('tenant_id', authResult.tenantId);
+  }
+
+  const { data: users, error } = await usersQuery;
 
   if (error) {
     console.error('Error fetching users:', error);
@@ -142,10 +152,12 @@ export async function POST(request: Request) {
     apellido?: string;
     email?: string;
     password?: string;
+    temp_password?: string;
     role?: UserRole;
     provincia_id?: string | null;
     municipio_id?: string | null;
     circunscripcion_id?: string | null;
+    movimiento_id?: string | null;
   };
 
   try {
@@ -157,18 +169,32 @@ export async function POST(request: Request) {
     );
   }
 
-  const { nombre, apellido, email, password, role, provincia_id, municipio_id, circunscripcion_id } = body;
+  const {
+    nombre,
+    apellido,
+    email,
+    password,
+    temp_password,
+    role,
+    provincia_id,
+    municipio_id,
+    circunscripcion_id,
+    movimiento_id,
+  } = body;
+
+  // temp_password takes precedence over password when provided
+  const resolvedPassword = temp_password ?? password;
 
   // Validate required fields
-  if (!nombre || !apellido || !email || !password || !role) {
+  if (!nombre || !apellido || !email || !resolvedPassword || !role) {
     return NextResponse.json(
-      { error: 'Faltan campos requeridos: nombre, apellido, email, password, role' },
+      { error: 'Faltan campos requeridos: nombre, apellido, email, password (o temp_password), role' },
       { status: 400 }
     );
   }
 
   // Validate role
-  const validRoles: UserRole[] = ['admin', 'coordinator', 'observer', 'field_worker'];
+  const validRoles: UserRole[] = ['admin', 'supervisor', 'coordinator', 'observer', 'field_worker'];
   if (!validRoles.includes(role)) {
     return NextResponse.json(
       { error: 'Rol invalido' },
@@ -177,7 +203,7 @@ export async function POST(request: Request) {
   }
 
   // Validate password length
-  if (password.length < 8) {
+  if (resolvedPassword.length < 8) {
     return NextResponse.json(
       { error: 'La contrasena debe tener al menos 8 caracteres' },
       { status: 400 }
@@ -190,7 +216,7 @@ export async function POST(request: Request) {
   const { data: authData, error: authError } =
     await adminClient.auth.admin.createUser({
       email,
-      password,
+      password: resolvedPassword,
       email_confirm: true,
       user_metadata: { role },
     });
@@ -215,7 +241,7 @@ export async function POST(request: Request) {
   // Step 2: Insert into usuarios table
   const { data: newUser, error: insertError } = await adminClient
     .from('usuarios')
-    // Supabase generated types are stale (missing platform_admin role / nombre field) — cast to never
+    // Supabase generated types are stale (missing new columns) — cast to never
     .insert({
       nombre,
       apellido,
@@ -226,6 +252,8 @@ export async function POST(request: Request) {
       provincia_id: provincia_id ?? null,
       municipio_id: municipio_id ?? null,
       circunscripcion_id: circunscripcion_id ?? null,
+      movimiento_id: movimiento_id ?? null,
+      force_password_change: temp_password !== undefined,
     } as never)
     .select()
     .single();

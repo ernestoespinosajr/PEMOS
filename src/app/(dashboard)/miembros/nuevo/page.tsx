@@ -23,10 +23,12 @@ export default function NuevoMiembroPage() {
   async function handleSubmit(data: CreateMemberData) {
     setSubmitError(null);
 
+    const { crear_acceso, acceso_email, acceso_temp_password, ...memberData } = data;
+
     const res = await fetch('/api/members', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(memberData),
     });
 
     const json = await res.json();
@@ -35,7 +37,32 @@ export default function NuevoMiembroPage() {
       throw new Error(json.error ?? 'Error al registrar miembro');
     }
 
-    // Redirect to the newly created member's detail page
+    // Optionally create a system user account for the new coordinator
+    if (crear_acceso && acceso_email && acceso_temp_password) {
+      const roleMap: Record<string, string> = {
+        coordinador: 'coordinator',
+        multiplicador: 'field_worker',
+      };
+      const userRole = roleMap[memberData.tipo_miembro] ?? 'field_worker';
+
+      try {
+        await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre: memberData.nombre,
+            apellido: memberData.apellido,
+            email: acceso_email,
+            temp_password: acceso_temp_password,
+            role: userRole,
+            movimiento_id: memberData.movimiento_id ?? null,
+          }),
+        });
+      } catch {
+        console.error('Error creating user access for coordinator');
+      }
+    }
+
     if (json.data?.id) {
       router.push(`/miembros/${json.data.id}`);
     } else {

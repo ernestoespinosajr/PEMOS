@@ -7,6 +7,8 @@ import { z } from 'zod';
 import {
   ChevronDown,
   ChevronUp,
+  Eye,
+  EyeOff,
   Loader2,
   Upload,
   UserCircle,
@@ -112,6 +114,8 @@ export function MemberForm({
   const [apiError, setApiError] = useState<string | null>(null);
   const [showSocial, setShowSocial] = useState(false);
 
+  const [cedulaWarning, setCedulaWarning] = useState<'own_org' | 'other_org' | null>(null);
+
   // Geographic state (not part of react-hook-form since cascading)
   const [provinciaId, setProvinciaId] = useState('');
   const [municipioId, setMunicipioId] = useState('');
@@ -120,6 +124,17 @@ export function MemberForm({
 
   // Coordinator
   const [coordinadorId, setCoordinadorId] = useState<string | null>(null);
+
+  // Movimiento selector (tenant-level admin only, create mode)
+  const [movimientos, setMovimientos] = useState<{ id: string; nombre: string }[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedMovimientoId, setSelectedMovimientoId] = useState('');
+
+  // User access creation (coordinator create mode only)
+  const [crearAcceso, setCrearAcceso] = useState(false);
+  const [accEmail, setAccEmail] = useState('');
+  const [accPassword, setAccPassword] = useState('');
+  const [showAccPassword, setShowAccPassword] = useState(false);
 
   // Photo
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -227,6 +242,32 @@ export function MemberForm({
       setPhotoPreview(member.foto_url);
     }
   }, [member]);
+
+  // Check admin status and fetch movimientos (create mode only)
+  useEffect(() => {
+    if (isEdit) return;
+    async function checkAndFetch() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const payload = JSON.parse(atob(session.access_token.split('.')[1] ?? ''));
+        const role = payload.app_role as string;
+        const movId = payload.movimiento_id as string | null | undefined;
+        if ((role === 'admin' || role === 'platform_admin') && !movId) {
+          setIsAdmin(true);
+          const res = await fetch('/api/movimientos');
+          if (res.ok) {
+            const json = await res.json();
+            setMovimientos(json.movimientos ?? []);
+          }
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+    checkAndFetch();
+  }, [isEdit]);
 
   // Fetch provincias on mount
   useEffect(() => {
@@ -403,6 +444,10 @@ export function MemberForm({
         sector_id: sectorId || null,
         coordinador_id: needsCoordinator ? coordinadorId : null,
         foto_url: fotoUrl,
+        movimiento_id: isAdmin ? (selectedMovimientoId || null) : undefined,
+        crear_acceso: (!isEdit && (tipoMiembro === 'coordinador' || tipoMiembro === 'multiplicador')) ? crearAcceso : undefined,
+        acceso_email: crearAcceso ? (accEmail || null) : undefined,
+        acceso_temp_password: crearAcceso ? (accPassword || null) : undefined,
       };
 
       await onSubmit(data);
@@ -459,8 +504,35 @@ export function MemberForm({
                   placeholder="000-0000000-0"
                   className="font-mono"
                   value={field.value}
-                  onChange={(e) => handleCedulaChange(e, field.onChange)}
-                  onBlur={field.onBlur}
+                  onChange={(e) => {
+                    handleCedulaChange(e, field.onChange);
+                    setCedulaWarning(null);
+                  }}
+                  onBlur={async () => {
+                    field.onBlur();
+                    const digits = field.value.replace(/\D/g, '');
+                    if (digits.length !== 11) return;
+                    try {
+                      const supabase = createClient();
+                      const { data } = await supabase.rpc(
+                        'check_cedula_duplicado' as never,
+                        { p_cedula: digits } as never
+                      );
+                      const result = data as {
+                        exists_in_own_org?: boolean;
+                        exists_in_other_org?: boolean;
+                      } | null;
+                      if (result?.exists_in_own_org) {
+                        setCedulaWarning('own_org');
+                      } else if (result?.exists_in_other_org) {
+                        setCedulaWarning('other_org');
+                      } else {
+                        setCedulaWarning(null);
+                      }
+                    } catch {
+                      setCedulaWarning(null);
+                    }
+                  }}
                   aria-invalid={!!errors.cedula}
                   aria-describedby={
                     errors.cedula ? 'member-cedula-error' : undefined
@@ -476,6 +548,26 @@ export function MemberForm({
               >
                 {errors.cedula.message}
               </p>
+            )}
+            {cedulaWarning === 'own_org' && (
+              <div
+                className="mt-1 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2"
+                role="alert"
+              >
+                <p className="text-xs text-yellow-800">
+                  Este ciudadano ya esta registrado en su organizacion.
+                </p>
+              </div>
+            )}
+            {cedulaWarning === 'other_org' && (
+              <div
+                className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2"
+                role="alert"
+              >
+                <p className="text-xs text-amber-800">
+                  Este ciudadano ya esta registrado en otra organizacion. Si no reconoce esto, contacte a su administrador.
+                </p>
+              </div>
             )}
           </div>
 
@@ -848,6 +940,25 @@ export function MemberForm({
             Selecciona un tipo de miembro primero.
           </p>
         )}
+
+        {isAdmin && !isEdit && (
+          <div className="space-y-1.5">
+            <Label htmlFor="member-movimiento">Asignar a Movimiento</Label>
+            <SelectNative
+              id="member-movimiento"
+              value={selectedMovimientoId}
+              onChange={(e) => setSelectedMovimientoId(e.target.value)}
+            >
+              <option value="">Org. Principal (sin movimiento)</option>
+              {movimientos.map((m) => (
+                <option key={m.id} value={m.id}>{m.nombre}</option>
+              ))}
+            </SelectNative>
+            <p className="text-xs text-muted-foreground">
+              Opcional. Deja en blanco para asignar a la organizacion principal.
+            </p>
+          </div>
+        )}
       </fieldset>
 
       {/* Section 6: Foto */}
@@ -914,6 +1025,67 @@ export function MemberForm({
           </div>
         </div>
       </fieldset>
+
+      {/* Section: Acceso al Sistema (coordinador/multiplicador create mode only) */}
+      {!isEdit && (tipoMiembro === 'coordinador' || tipoMiembro === 'multiplicador') && (
+        <fieldset className="space-y-4 rounded-lg border border-border p-4">
+          <legend className="px-1 text-sm font-semibold text-primary-text">
+            Acceso al Sistema
+          </legend>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={crearAcceso}
+              onChange={(e) => setCrearAcceso(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            <span className="text-sm text-primary-text">
+              Crear cuenta de acceso para este coordinador
+            </span>
+          </label>
+          {crearAcceso && (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="acc-email">Correo electronico *</Label>
+                <Input
+                  id="acc-email"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={accEmail}
+                  onChange={(e) => setAccEmail(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="acc-password">Contrasena temporal *</Label>
+                <div className="relative">
+                  <Input
+                    id="acc-password"
+                    type={showAccPassword ? 'text' : 'password'}
+                    placeholder="Minimo 8 caracteres"
+                    value={accPassword}
+                    onChange={(e) => setAccPassword(e.target.value)}
+                    disabled={submitting}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAccPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary-text"
+                    aria-label={showAccPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+                  >
+                    {showAccPassword
+                      ? <EyeOff size={16} aria-hidden="true" />
+                      : <Eye size={16} aria-hidden="true" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  El usuario debera cambiarla en su primer acceso.
+                </p>
+              </div>
+            </div>
+          )}
+        </fieldset>
+      )}
 
       {/* API Error */}
       {apiError && (

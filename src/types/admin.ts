@@ -19,11 +19,14 @@ export interface AdminUser {
   municipio_id: string | null;
   circunscripcion_id: string | null;
   tenant_id: string | null;
+  movimiento_id: string | null;
   created_at: string;
   /** Resolved names for display (joined from geographic tables) */
   provincia_nombre?: string | null;
   municipio_nombre?: string | null;
   circunscripcion_nombre?: string | null;
+  /** Resolved movimiento name for display */
+  movimiento_nombre?: string | null;
 }
 
 /**

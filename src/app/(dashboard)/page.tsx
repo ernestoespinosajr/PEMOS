@@ -77,19 +77,25 @@ const ROLE_VISIBLE_METRICS: Record<string, string[]> = {
  */
 export default function DashboardPage() {
   const [period, setPeriod] = useState<PeriodOption>('1M');
-  const { metrics, isLoading, error, refetch } = useDashboardMetrics(period);
   const {
     role,
     roleLabel,
     dashboardTitle,
     dashboardSubtitle,
     isLoading: scopeLoading,
+    movimientoNombre,
+    movimientoId,
   } = useUserScope();
 
+  // Pass movimientoId so each hook:
+  //   1. Keys its cache on scope (prevents cross-scope stale hits)
+  //   2. Adds an explicit filter for admin-role users (RLS doesn't scope admin)
+  const { metrics, isLoading, error, refetch } = useDashboardMetrics(period, movimientoId);
+
   // Chart data hooks -- fetching runs in parallel with metrics
-  const memberChart = useMemberChartData(period);
-  const registrationChart = useRegistrationChartData(period);
-  const distributionChart = useDistributionChartData(period);
+  const memberChart = useMemberChartData(period, movimientoId);
+  const registrationChart = useRegistrationChartData(period, movimientoId);
+  const distributionChart = useDistributionChartData(period, movimientoId);
 
   // Filter metrics based on role visibility
   const visibleMetrics = useMemo(() => {
@@ -119,6 +125,7 @@ export default function DashboardPage() {
         title={dashboardTitle}
         subtitle={dashboardSubtitle}
         isLoading={scopeLoading}
+        movimientoNombre={movimientoNombre}
       />
 
       {/* Period Selector */}

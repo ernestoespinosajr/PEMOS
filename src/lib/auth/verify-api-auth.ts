@@ -19,6 +19,7 @@ interface AuthSuccess {
   partidoId: string | null;
   role: string;
   authUserId: string;
+  movimientoId: string | null;
 }
 
 export type AuthResult = AuthFailure | AuthSuccess;
@@ -69,7 +70,8 @@ export async function verifyApiAuth(
 
     const { data: dbUser, error: dbError } = await supabase
       .from('usuarios')
-      .select('id, role, tenant_id')
+      // movimiento_id is not in stale generated types — cast to access new column
+      .select('id, role, tenant_id, movimiento_id' as 'id, role, tenant_id')
       .eq('auth_user_id', user.id)
       .single();
 
@@ -99,12 +101,14 @@ export async function verifyApiAuth(
       }
     }
 
+    const dbUserAny = dbUser as unknown as Record<string, unknown>;
     return {
       authorized: true as const,
-      tenantId: dbUser.tenant_id as string | null,
+      tenantId: dbUserAny.tenant_id as string | null,
       partidoId,
-      role: dbUser.role as string,
+      role: dbUserAny.role as string,
       authUserId: user.id,
+      movimientoId: (dbUserAny.movimiento_id as string | null | undefined) ?? null,
     };
   } catch (err) {
     console.error('verifyApiAuth: unexpected error:', err);

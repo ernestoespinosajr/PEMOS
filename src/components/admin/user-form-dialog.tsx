@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,8 +18,15 @@ import { Label } from '@/components/ui/label';
 import { SelectNative } from '@/components/ui/select-native';
 import { GeographicScopeSelector } from '@/components/admin/geographic-scope-selector';
 import { ROLES } from '@/lib/auth/roles';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import type { AdminUser } from '@/types/admin';
+
+// ---------- Movimiento Option ----------
+
+interface MovimientoOption {
+  id: string;
+  nombre: string;
+}
 
 // ---------- Zod Schemas ----------
 
@@ -30,15 +37,16 @@ const createUserSchema = z.object({
   password: z
     .string()
     .min(8, 'La contrasena debe tener al menos 8 caracteres'),
-  role: z.enum(['platform_admin', 'admin', 'coordinator', 'observer', 'field_worker'], {
+  role: z.enum(['platform_admin', 'admin', 'supervisor', 'coordinator', 'observer', 'field_worker'], {
     message: 'Selecciona un rol',
   }),
+  movimiento_id: z.string().optional().default(''),
 });
 
 const editUserSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
   apellido: z.string().min(1, 'El apellido es requerido'),
-  role: z.enum(['platform_admin', 'admin', 'coordinator', 'observer', 'field_worker'], {
+  role: z.enum(['platform_admin', 'admin', 'supervisor', 'coordinator', 'observer', 'field_worker'], {
     message: 'Selecciona un rol',
   }),
 });
@@ -61,6 +69,8 @@ export function CreateUserDialog({
 }: CreateUserDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [movimientos, setMovimientos] = useState<MovimientoOption[]>([]);
 
   const [provinciaId, setProvinciaId] = useState<string | null>(null);
   const [municipioId, setMunicipioId] = useState<string | null>(null);
@@ -73,20 +83,39 @@ export function CreateUserDialog({
     watch,
     formState: { errors },
   } = useForm<CreateFormData>({
-    resolver: zodResolver(createUserSchema),
+    resolver: zodResolver(createUserSchema) as never,
     defaultValues: {
       nombre: '',
       apellido: '',
       email: '',
       password: '',
       role: undefined,
+      movimiento_id: '',
     },
   });
 
   const selectedRole = watch('role');
   const showGeoScope = selectedRole && selectedRole !== 'admin';
+  const isPlatformAdmin = selectedRole === 'platform_admin';
 
-  // Reset form when dialog closes
+  const fetchMovimientos = useCallback(async () => {
+    try {
+      const res = await fetch('/api/movimientos');
+      if (res.ok) {
+        const json = await res.json();
+        setMovimientos(json.movimientos ?? []);
+      }
+    } catch {
+      // Non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      fetchMovimientos();
+    }
+  }, [open, fetchMovimientos]);
+
   useEffect(() => {
     if (!open) {
       reset();
@@ -94,6 +123,7 @@ export function CreateUserDialog({
       setMunicipioId(null);
       setCircunscripcionId(null);
       setApiError(null);
+      setShowPassword(false);
     }
   }, [open, reset]);
 
@@ -107,9 +137,11 @@ export function CreateUserDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
+          temp_password: data.password,
           provincia_id: provinciaId,
           municipio_id: municipioId,
           circunscripcion_id: circunscripcionId,
+          movimiento_id: data.movimiento_id || null,
         }),
       });
 
@@ -219,16 +251,31 @@ export function CreateUserDialog({
             <Label htmlFor="create-password">
               Contrasena temporal <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="create-password"
-              type="password"
-              placeholder="Minimo 8 caracteres"
-              aria-invalid={!!errors.password}
-              aria-describedby={
-                errors.password ? 'create-password-error' : undefined
-              }
-              {...register('password')}
-            />
+            <div className="relative">
+              <Input
+                id="create-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Minimo 8 caracteres"
+                aria-invalid={!!errors.password}
+                aria-describedby={
+                  errors.password ? 'create-password-error' : undefined
+                }
+                className="pr-10"
+                {...register('password')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
+              </button>
+            </div>
             {errors.password && (
               <p
                 id="create-password-error"
@@ -270,6 +317,27 @@ export function CreateUserDialog({
               </p>
             )}
           </div>
+
+          {/* Asignar a Movimiento */}
+          {!isPlatformAdmin && (
+            <div className="space-y-1.5">
+              <Label htmlFor="create-movimiento">Asignar a Movimiento</Label>
+              <SelectNative
+                id="create-movimiento"
+                {...register('movimiento_id')}
+              >
+                <option value="">Org. Principal (sin movimiento)</option>
+                {movimientos.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </SelectNative>
+              <p className="text-xs text-muted-foreground">
+                Opcional. Si se deja en blanco, el usuario pertenece a la organizacion principal.
+              </p>
+            </div>
+          )}
 
           {/* Geographic Scope */}
           {showGeoScope && (
@@ -666,6 +734,331 @@ export function DeactivateUserDialog({
               />
             )}
             Desactivar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------- Change Password Dialog ----------
+
+interface ChangePasswordDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  user: AdminUser | null;
+  onSuccess: () => void;
+}
+
+const changePasswordSchema = z
+  .object({
+    new_password: z
+      .string()
+      .min(8, 'La contrasena debe tener al menos 8 caracteres'),
+    confirm_password: z.string().min(1, 'Confirma la contrasena'),
+  })
+  .refine((data) => data.new_password === data.confirm_password, {
+    message: 'Las contrasenas no coinciden',
+    path: ['confirm_password'],
+  });
+
+type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+
+export function ChangePasswordDialog({
+  open,
+  onOpenChange,
+  user,
+  onSuccess,
+}: ChangePasswordDialogProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ChangePasswordFormData>({
+    resolver: zodResolver(changePasswordSchema) as never,
+    defaultValues: { new_password: '', confirm_password: '' },
+  });
+
+  useEffect(() => {
+    if (!open) {
+      reset();
+      setApiError(null);
+      setShowNew(false);
+      setShowConfirm(false);
+    }
+  }, [open, reset]);
+
+  async function onSubmit(data: ChangePasswordFormData) {
+    if (!user) return;
+    setSubmitting(true);
+    setApiError(null);
+
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_password: data.new_password }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setApiError(json.error ?? 'Error al cambiar contrasena');
+        setSubmitting(false);
+        return;
+      }
+
+      onSuccess();
+      onOpenChange(false);
+    } catch {
+      setApiError('Error de conexion. Intenta nuevamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Cambiar Contrasena</DialogTitle>
+          <DialogDescription>
+            {user
+              ? `Establece una nueva contrasena para ${user.nombre} ${user.apellido}.`
+              : 'Establece una nueva contrasena para este usuario.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="cp-new">
+              Nueva contrasena <span className="text-destructive">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="cp-new"
+                type={showNew ? 'text' : 'password'}
+                placeholder="Minimo 8 caracteres"
+                aria-invalid={!!errors.new_password}
+                className="pr-10"
+                {...register('new_password')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                aria-label={showNew ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+              >
+                {showNew ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+            {errors.new_password && (
+              <p className="text-xs text-destructive" role="alert">
+                {errors.new_password.message}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cp-confirm">
+              Confirmar contrasena <span className="text-destructive">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="cp-confirm"
+                type={showConfirm ? 'text' : 'password'}
+                placeholder="Repite la contrasena"
+                aria-invalid={!!errors.confirm_password}
+                className="pr-10"
+                {...register('confirm_password')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                aria-label={showConfirm ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+              >
+                {showConfirm ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+            {errors.confirm_password && (
+              <p className="text-xs text-destructive" role="alert">
+                {errors.confirm_password.message}
+              </p>
+            )}
+          </div>
+
+          {apiError && (
+            <div
+              className="rounded-md border border-destructive/20 bg-destructive/5 p-3"
+              role="alert"
+              aria-live="polite"
+            >
+              <p className="text-sm text-destructive">{apiError}</p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------- Reasignar Movimiento Dialog ----------
+
+interface ReasignarMovimientoDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  user: AdminUser | null;
+  onSuccess: () => void;
+}
+
+export function ReasignarMovimientoDialog({
+  open,
+  onOpenChange,
+  user,
+  onSuccess,
+}: ReasignarMovimientoDialogProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [movimientos, setMovimientos] = useState<MovimientoOption[]>([]);
+  const [selectedMovimientoId, setSelectedMovimientoId] = useState<string>('');
+
+  const fetchMovimientos = useCallback(async () => {
+    try {
+      const res = await fetch('/api/movimientos');
+      if (res.ok) {
+        const json = await res.json();
+        setMovimientos(json.movimientos ?? []);
+      }
+    } catch {
+      // Non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      fetchMovimientos();
+      setSelectedMovimientoId(user?.movimiento_id ?? '');
+      setApiError(null);
+    }
+  }, [open, user, fetchMovimientos]);
+
+  async function handleSubmit() {
+    if (!user) return;
+    setSubmitting(true);
+    setApiError(null);
+
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/movimiento`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          movimiento_id: selectedMovimientoId || null,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setApiError(json.error ?? 'Error al reasignar movimiento');
+        setSubmitting(false);
+        return;
+      }
+
+      onSuccess();
+      onOpenChange(false);
+    } catch {
+      setApiError('Error de conexion. Intenta nuevamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Reasignar Movimiento</DialogTitle>
+          <DialogDescription>
+            {user
+              ? `Cambia el movimiento asignado a ${user.nombre} ${user.apellido}.`
+              : 'Cambia el movimiento asignado a este usuario.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="rm-movimiento">Movimiento</Label>
+            <SelectNative
+              id="rm-movimiento"
+              value={selectedMovimientoId}
+              onChange={(e) => setSelectedMovimientoId(e.target.value)}
+            >
+              <option value="">Org. Principal (sin movimiento)</option>
+              {movimientos.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                </option>
+              ))}
+            </SelectNative>
+          </div>
+
+          {apiError && (
+            <div
+              className="rounded-md border border-destructive/20 bg-destructive/5 p-3"
+              role="alert"
+              aria-live="polite"
+            >
+              <p className="text-sm text-destructive">{apiError}</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleSubmit} disabled={submitting}>
+            {submitting && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+            )}
+            Guardar
           </Button>
         </DialogFooter>
       </DialogContent>

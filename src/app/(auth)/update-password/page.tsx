@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -53,8 +52,6 @@ type UpdatePasswordFormData = z.infer<typeof updatePasswordSchema>;
 
 /* ---------- Component ---------- */
 export default function UpdatePasswordPage() {
-  const router = useRouter();
-
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -70,6 +67,12 @@ export default function UpdatePasswordPage() {
   async function onSubmit(data: UpdatePasswordFormData) {
     setAuthError(null);
 
+    // Clear the DB flag first so the new JWT issued by updateUser won't carry it
+    const { error: clearError } = await getSupabase().rpc('clear_own_force_password_change');
+    if (clearError) {
+      console.error('Failed to clear force_password_change:', clearError);
+    }
+
     const { error } = await getSupabase().auth.updateUser({
       password: data.password,
     });
@@ -79,8 +82,7 @@ export default function UpdatePasswordPage() {
       return;
     }
 
-    router.push('/login');
-    router.refresh();
+    window.location.href = '/';
   }
 
   /* ---------- Render ---------- */

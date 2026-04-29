@@ -28,18 +28,18 @@ export interface MemberChartDataState {
 
 // ---------- Cache ----------
 
-const cache: {
-  data: MemberCountByLevel[] | null;
-  timestamp: number;
-} = {
-  data: null,
-  timestamp: 0,
-};
+/** Keyed by movimientoId (or 'null') so scoped and unscoped users don't share cached data. */
+const cache = new Map<string, { data: MemberCountByLevel[]; timestamp: number }>();
 
 const STALE_TIME = 30_000; // 30 seconds
 
-function isCacheValid(): boolean {
-  return cache.data !== null && Date.now() - cache.timestamp < STALE_TIME;
+function cacheKey(movimientoId: string | null): string {
+  return movimientoId ?? 'null';
+}
+
+function isCacheValid(movimientoId: string | null): boolean {
+  const entry = cache.get(cacheKey(movimientoId));
+  return entry != null && Date.now() - entry.timestamp < STALE_TIME;
 }
 
 // ---------- Hook ----------
@@ -54,8 +54,11 @@ function isCacheValid(): boolean {
  * - Attempts RPC `get_member_counts` first, falls back to direct table query
  *
  * @param _period - The selected time period (unused for geographic counts, included for API consistency)
+ * @param movimientoId - The user's movimiento scope from JWT. Non-null for
+ *   scoped users; null for tenant-wide admins. Used as part of the cache key
+ *   and to apply an explicit filter for admin-role users (whom RLS does not scope).
  */
-export function useMemberChartData(_period: PeriodOption): MemberChartDataState {
+export function useMemberChartData(_period: PeriodOption, movimientoId: string | null = null): MemberChartDataState {
   const [data, setData] = useState<MemberCountByLevel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +66,8 @@ export function useMemberChartData(_period: PeriodOption): MemberChartDataState 
 
   const fetchData = useCallback(
     async (skipCache = false) => {
-      if (!skipCache && isCacheValid()) {
-        setData(cache.data!);
+      if (!skipCache && isCacheValid(movimientoId)) {
+        setData(cache.get(cacheKey(movimientoId))!.data);
         setIsLoading(false);
         setError(null);
         return;
@@ -81,11 +84,13 @@ export function useMemberChartData(_period: PeriodOption): MemberChartDataState 
         const supabase = createClient();
         let chartData: MemberCountByLevel[] = [];
 
-        // Try RPC function first (materialized view with security wrapper)
-        // The RPC may not be in the generated types yet -- cast to bypass strict typing
+        // Try RPC function first (materialized view with security wrapper).
+        // Pass movimientoId so the RPC can scope its aggregation when the
+        // calling user is a scoped admin (for other roles RLS handles it).
+        // The RPC may not be in the generated types yet -- cast to bypass strict typing.
         const rpcResult = await (supabase.rpc as CallableFunction)(
           'get_member_counts',
-          { p_nivel: 'provincia' }
+          { p_nivel: 'provincia', p_movimiento_id: movimientoId ?? null }
         );
 
         if (!rpcResult.error && rpcResult.data && Array.isArray(rpcResult.data)) {
@@ -112,7 +117,7 @@ export function useMemberChartData(_period: PeriodOption): MemberChartDataState 
           );
 
           // Get all members with joined provincia name
-          const { data: members, error: membersError } = await supabase
+          const joinQuery = supabase
             .from('miembros')
             .select(
               `
@@ -127,6 +132,9 @@ export function useMemberChartData(_period: PeriodOption): MemberChartDataState 
             `
             )
             .eq('estado', true);
+          const { data: members, error: membersError } = await (movimientoId
+            ? joinQuery.eq('movimiento_id', movimientoId)
+            : joinQuery);
 
           if (membersError) {
             // Final fallback: aggregate by tipo_miembro only (no geographic breakdown)
@@ -136,13 +144,14 @@ export function useMemberChartData(_period: PeriodOption): MemberChartDataState 
             const tipos = ['coordinador', 'multiplicador', 'relacionado'] as const;
 
             const counts = await Promise.all(
-              tipos.map((tipo) =>
-                supabase
+              tipos.map((tipo) => {
+                const q = supabase
                   .from('miembros')
                   .select('id', { count: 'exact', head: true })
                   .eq('tipo_miembro', tipo)
-                  .eq('estado', true)
-              )
+                  .eq('estado', true);
+                return movimientoId ? q.eq('movimiento_id', movimientoId) : q;
+              })
             );
 
             chartData = levels.map((name, i) => ({
@@ -195,9 +204,8 @@ export function useMemberChartData(_period: PeriodOption): MemberChartDataState 
 
         if (controller.signal.aborted) return;
 
-        // Update cache
-        cache.data = chartData;
-        cache.timestamp = Date.now();
+        // Update scope-keyed cache
+        cache.set(cacheKey(movimientoId), { data: chartData, timestamp: Date.now() });
 
         setData(chartData);
         setError(null);
@@ -211,8 +219,8 @@ export function useMemberChartData(_period: PeriodOption): MemberChartDataState 
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- _period included to refetch on period change
-    [_period]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- _period and movimientoId included to refetch on change
+    [_period, movimientoId]
   );
 
   useEffect(() => {

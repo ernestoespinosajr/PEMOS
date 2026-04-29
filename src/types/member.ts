@@ -133,6 +133,9 @@ export interface CreateMemberData {
   movimiento_id?: string | null;
   tipo_movimiento?: string | null;
   votacion?: boolean;
+  crear_acceso?: boolean;
+  acceso_email?: string | null;
+  acceso_temp_password?: string | null;
 }
 
 /** Data shape for updating an existing member. */

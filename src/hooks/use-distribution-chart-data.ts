@@ -42,18 +42,18 @@ const ROLE_COLORS: Record<string, string> = {
 
 // ---------- Cache ----------
 
-const cache: {
-  data: DistributionSlice[] | null;
-  timestamp: number;
-} = {
-  data: null,
-  timestamp: 0,
-};
+/** Keyed by movimientoId (or 'null') to prevent cross-scope cache hits. */
+const cache = new Map<string, { data: DistributionSlice[]; timestamp: number }>();
 
 const STALE_TIME = 30_000; // 30 seconds
 
-function isCacheValid(): boolean {
-  return cache.data !== null && Date.now() - cache.timestamp < STALE_TIME;
+function cacheKey(movimientoId: string | null): string {
+  return movimientoId ?? 'null';
+}
+
+function isCacheValid(movimientoId: string | null): boolean {
+  const entry = cache.get(cacheKey(movimientoId));
+  return entry != null && Date.now() - entry.timestamp < STALE_TIME;
 }
 
 // ---------- Hook ----------
@@ -68,9 +68,12 @@ function isCacheValid(): boolean {
  * - Queries member counts by tipo_miembro
  *
  * @param _period - The selected time period (included for API consistency)
+ * @param movimientoId - The user's movimiento scope from JWT. Non-null for
+ *   scoped users; null for tenant-wide admins.
  */
 export function useDistributionChartData(
-  _period: PeriodOption
+  _period: PeriodOption,
+  movimientoId: string | null = null
 ): DistributionChartDataState {
   const [data, setData] = useState<DistributionSlice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,8 +82,8 @@ export function useDistributionChartData(
 
   const fetchData = useCallback(
     async (skipCache = false) => {
-      if (!skipCache && isCacheValid()) {
-        setData(cache.data!);
+      if (!skipCache && isCacheValid(movimientoId)) {
+        setData(cache.get(cacheKey(movimientoId))!.data);
         setIsLoading(false);
         setError(null);
         return;
@@ -97,15 +100,17 @@ export function useDistributionChartData(
         const supabase = createClient();
         const tipos = ['coordinador', 'multiplicador', 'relacionado'] as const;
 
-        // Fetch counts for each tipo_miembro in parallel
+        // Fetch counts for each tipo_miembro in parallel.
+        // Apply movimientoId filter for scoped admins (RLS doesn't scope admin).
         const results = await Promise.all(
-          tipos.map((tipo) =>
-            supabase
+          tipos.map((tipo) => {
+            const q = supabase
               .from('miembros')
               .select('id', { count: 'exact', head: true })
               .eq('tipo_miembro', tipo)
-              .eq('estado', true)
-          )
+              .eq('estado', true);
+            return movimientoId ? q.eq('movimiento_id', movimientoId) : q;
+          })
         );
 
         if (controller.signal.aborted) return;
@@ -124,9 +129,8 @@ export function useDistributionChartData(
           color: ROLE_COLORS[c.tipo] ?? '#2D6A4F',
         }));
 
-        // Update cache
-        cache.data = chartData;
-        cache.timestamp = Date.now();
+        // Update scope-keyed cache
+        cache.set(cacheKey(movimientoId), { data: chartData, timestamp: Date.now() });
 
         setData(chartData);
         setError(null);
@@ -140,8 +144,8 @@ export function useDistributionChartData(
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- _period included to refetch on period change
-    [_period]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- _period and movimientoId included to refetch on change
+    [_period, movimientoId]
   );
 
   useEffect(() => {

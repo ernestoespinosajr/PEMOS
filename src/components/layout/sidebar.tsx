@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   BarChart3,
@@ -48,6 +49,11 @@ const navSections: NavSection[] = [
         title: 'Miembros',
         href: '/miembros',
         icon: Users,
+      },
+      {
+        title: 'Movimientos',
+        href: '/movimientos',
+        icon: Building2,
       },
       {
         title: 'Jerarquia',
@@ -110,16 +116,6 @@ const navSections: NavSection[] = [
 
 const bottomItems = [
   {
-    title: 'Usuarios',
-    href: '/configuracion/usuarios',
-    icon: Users,
-  },
-  {
-    title: 'Organizacion',
-    href: '/configuracion/organizacion',
-    icon: Building2,
-  },
-  {
     title: 'Configuracion',
     href: '/configuracion',
     icon: Settings,
@@ -136,6 +132,53 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { branding } = useTenantBranding();
+
+  const [appRole, setAppRole] = useState<string | null>(null);
+  const [movimientoId, setMovimientoId] = useState<string | null>(null);
+  const [movimientoNombre, setMovimientoNombre] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadClaims() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token || cancelled) return;
+
+        const parts = session.access_token.split('.');
+        const claims = JSON.parse(atob(parts[1] ?? ''));
+        const role = (claims.app_role as string) ?? null;
+        const movId = (claims.movimiento_id as string | null) ?? null;
+
+        if (cancelled) return;
+        setAppRole(role);
+        setMovimientoId(movId);
+
+        if (movId) {
+          try {
+            const res = await fetch(`/api/movimientos/${movId}`);
+            if (res.ok) {
+              const json = await res.json();
+              if (!cancelled) {
+                setMovimientoNombre(json.movimiento?.nombre ?? null);
+              }
+            }
+          } catch {
+            // Non-fatal
+          }
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    loadClaims();
+    return () => { cancelled = true; };
+  }, []);
+
+  const isAdminWithoutMovimiento =
+    (appRole === 'admin' || appRole === 'platform_admin') && !movimientoId;
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -173,15 +216,21 @@ export function Sidebar({
             height={28}
             className="flex-shrink-0 rounded"
             onError={(e) => {
-              // Fallback to default logo on error
               const target = e.currentTarget;
               target.src = '/logo.svg';
             }}
           />
           {(!isCollapsed || isMobile) && (
-            <span className="truncate text-lg font-bold text-primary-text">
-              {brandName}
-            </span>
+            <div className="min-w-0">
+              <span className="block truncate text-lg font-bold text-primary-text">
+                {brandName}
+              </span>
+              {movimientoNombre && (
+                <span className="block truncate text-xs text-secondary-text font-normal">
+                  {movimientoNombre}
+                </span>
+              )}
+            </div>
           )}
         </Link>
 
@@ -213,7 +262,12 @@ export function Sidebar({
 
             {/* Section Items */}
             <ul role="list" className="space-y-space-1 px-space-2">
-              {section.items.map((item) => {
+              {section.items.filter((item) => {
+                if (item.href === '/movimientos') {
+                  return isAdminWithoutMovimiento;
+                }
+                return true;
+              }).map((item) => {
                 const active = isActive(item.href);
                 const Icon = item.icon;
 

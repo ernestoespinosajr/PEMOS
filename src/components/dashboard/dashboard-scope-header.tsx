@@ -17,6 +17,8 @@ interface DashboardScopeHeaderProps {
   subtitle: string;
   /** Whether the scope data is still loading. */
   isLoading?: boolean;
+  /** Name of the movimiento the user is scoped to. Null if not scoped. */
+  movimientoNombre?: string | null;
 }
 
 // ---------- Role visual configuration ----------
@@ -43,6 +45,12 @@ const ROLE_VISUALS: Record<UserRole, RoleVisualConfig> = {
     badgeBg: 'bg-primary-tint',
     badgeText: 'text-primary',
     badgeIcon: 'text-primary',
+  },
+  supervisor: {
+    icon: MapPin,
+    badgeBg: 'bg-teal-50',
+    badgeText: 'text-teal-700',
+    badgeIcon: 'text-teal-600',
   },
   coordinator: {
     icon: MapPin,
@@ -91,6 +99,7 @@ export function DashboardScopeHeader({
   title,
   subtitle,
   isLoading = false,
+  movimientoNombre,
 }: DashboardScopeHeaderProps) {
   // Loading state
   if (isLoading) {
@@ -134,7 +143,7 @@ export function DashboardScopeHeader({
 
       {/* Dashboard Title */}
       <h2 className="text-2xl font-bold tracking-tight text-primary-text">
-        {title}
+        {movimientoNombre ? `${title} — ${movimientoNombre}` : title}
       </h2>
 
       {/* Scope Description */}

@@ -9,6 +9,8 @@ import {
   CreateUserDialog,
   EditUserDialog,
   DeactivateUserDialog,
+  ChangePasswordDialog,
+  ReasignarMovimientoDialog,
 } from '@/components/admin/user-form-dialog';
 import { Plus, Search, Loader2 } from 'lucide-react';
 import type { AdminUser } from '@/types/admin';
@@ -39,6 +41,8 @@ export default function UsuariosPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [reasignarMovimientoOpen, setReasignarMovimientoOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
 
   // Fetch users
@@ -77,6 +81,16 @@ export default function UsuariosPage() {
   function handleDeactivate(user: AdminUser) {
     setSelectedUser(user);
     setDeactivateOpen(true);
+  }
+
+  function handleChangePassword(user: AdminUser) {
+    setSelectedUser(user);
+    setChangePasswordOpen(true);
+  }
+
+  function handleReasignarMovimiento(user: AdminUser) {
+    setSelectedUser(user);
+    setReasignarMovimientoOpen(true);
   }
 
   function handleMutationSuccess() {
@@ -168,6 +182,8 @@ export default function UsuariosPage() {
         loading={loading}
         onEdit={handleEdit}
         onDeactivate={handleDeactivate}
+        onChangePassword={handleChangePassword}
+        onReasignarMovimiento={handleReasignarMovimiento}
       />
 
       {/* Dialogs */}
@@ -187,6 +203,20 @@ export default function UsuariosPage() {
       <DeactivateUserDialog
         open={deactivateOpen}
         onOpenChange={setDeactivateOpen}
+        user={selectedUser}
+        onSuccess={handleMutationSuccess}
+      />
+
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
+        user={selectedUser}
+        onSuccess={handleMutationSuccess}
+      />
+
+      <ReasignarMovimientoDialog
+        open={reasignarMovimientoOpen}
+        onOpenChange={setReasignarMovimientoOpen}
         user={selectedUser}
         onSuccess={handleMutationSuccess}
       />
