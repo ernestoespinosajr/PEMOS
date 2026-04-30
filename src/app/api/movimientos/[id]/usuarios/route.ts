@@ -45,7 +45,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const { data, error, count } = await supabase
     .from('usuarios')
     .select(
-      'id, nombre, apellido, email, role, estado' as 'id, nombre, apellido, email, role, estado',
+      'id, nombre, apellido, email, role, estado' as const,
       { count: 'exact' }
     )
     .eq('movimiento_id' as 'id', params.id as never)
